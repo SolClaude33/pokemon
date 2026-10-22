@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtUSDC, type Pull } from "@/lib/odds";
-import { sfx } from "@/lib/audio";
+import { duckMusic, sfx } from "@/lib/audio";
 import { buybackFor } from "@/lib/packs";
 import { rarityMeta } from "@/lib/rarity";
 import { sellBack } from "@/lib/vault";
@@ -78,6 +78,11 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
   useEffect(() => {
     dialogRef.current?.focus();
   }, [phase]);
+
+  useEffect(() => {
+    duckMusic(true);
+    return () => duckMusic(false);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

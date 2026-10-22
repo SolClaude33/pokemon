@@ -28,7 +28,7 @@ Direction: late-night CRT channel ripping Pokémon packs, seen through Game Boy-
 - Colors in `globals.css :root`: `--screen #0b0d11`, `--phosphor #ece6d6`, `--dim`, `--faint`, `--line`, `--poke-yellow #ffcb05`, `--poke-blue #2a75bb`, `--poke-blue-deep #1b3f78`, `--poke-red/--signal #ee1515`, `--ok`, `--warn`, `--gb-paper`, `--holo`, rarity `--r-*`.
 - Type: Lilita One (display; `.poke-title` = yellow fill + blue outline), Fragment Mono (body/HUD, `.hud` uppercase 11px), Press Start 2P (`.pixel` labels, `.gb-dialog` Game Boy text boxes).
 - Buttons: `.btn-primary` Pokémon yellow with a 3px bottom bevel. Radii: screen 34px, UI 2–4px; motion `--ease-out` cubic-bezier(.16,1,.3,1), 160/420/900ms; honor reduced motion.
-- Audio: `src/lib/audio.ts` synthesizes original Game Boy-style chiptune (pulse/triangle/noise) with Web Audio — background loop + `sfx.*` effects; starts on first user gesture; HUD toggles persist in localStorage `pc:audio`. Never ship real Pokémon game audio.
+- Audio: background music is `public/assets/audio/bgm.mp3` (Nicol's track, loudness-normalized to ~-20 LUFS with ffmpeg; original in `assets-src/audio/`), looped gap-free via Web Audio and ducked during pack openings. `sfx.*` in `src/lib/audio.ts` are synthesized Game Boy-style effects (menu blips, Poké Ball wobble, catch click, shiny sparkle, item-get jingles by rarity). Starts on first user gesture; HUD toggles persist in localStorage `pc:audio`.
 - 3D: React Three Fiber, `flat` (no tone mapping) so printed art keeps its colors; lights from drei Lightformers (no HDR downloads).
 
 ## Conventions & limits
