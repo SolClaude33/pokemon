@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { Logo } from "./Logo";
 import { WalletButton } from "./WalletButton";
 
@@ -28,39 +28,6 @@ function useClock() {
   };
 }
 
-function BootScreen({ onDone }: { onDone: () => void }) {
-  const [pct, setPct] = useState(0);
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem("hv:booted")) {
-        onDone();
-        return;
-      }
-    } catch {}
-    let p = 0;
-    const t = setInterval(() => {
-      p = Math.min(100, p + 7 + Math.random() * 16);
-      setPct(Math.floor(p));
-      if (p >= 100) {
-        clearInterval(t);
-        setTimeout(onDone, 220);
-      }
-    }, 70);
-    return () => clearInterval(t);
-  }, [onDone]);
-  return (
-    <div className="absolute inset-0 z-30 flex items-end bg-screen px-[clamp(20px,4vw,40px)] pb-[clamp(56px,9vh,84px)]" role="status" aria-label="Loading">
-      <div className="w-full">
-        <div className="hud mb-3 flex justify-between text-dim">
-          <span>Tuning channel</span>
-          <span>{pct}</span>
-        </div>
-        <div className="boot-bar" style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }} />
-      </div>
-    </div>
-  );
-}
-
 const NAV_LEFT = [
   { href: "/dex", label: "Dex", short: "Dex" },
   { href: "/market", label: "PokéMart", short: "Mart" },
@@ -74,14 +41,6 @@ export function TvShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { clock, timer } = useClock();
   const [bw, setBw] = useState(false);
-  const [booting, setBooting] = useState(true);
-
-  const doneBoot = useCallback(() => {
-    setBooting(false);
-    try {
-      sessionStorage.setItem("hv:booted", "1");
-    } catch {}
-  }, []);
 
   return (
     <div className="tv">
@@ -157,7 +116,6 @@ export function TvShell({ children }: { children: ReactNode }) {
             </div>
           </footer>
 
-          {booting && <BootScreen onDone={doneBoot} />}
         </div>
 
         <div className="crt-overlay crt-mask" aria-hidden="true" />

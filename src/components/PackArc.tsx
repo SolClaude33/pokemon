@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtUSDC } from "@/lib/odds";
 import { useMounted, useReducedMotion, useWebGL } from "@/lib/useClient";
-import { LogoMark } from "./Logo";
+import { LoadingScreen } from "./LoadingScreen";
 import { PackArt } from "./PackArt";
 
 const ArcCanvas = dynamic(() => import("./three/ArcCanvas"), { ssr: false });
@@ -163,17 +163,8 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
       </div>
       )}
 
-      {/* loading screen: hides the stage until the 3D packs are in their final place */}
-      <div
-        role="status"
-        aria-label="Loading packs"
-        aria-hidden={!loading}
-        className={`absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 bg-screen transition-opacity duration-700 ${loading ? "opacity-100" : "pointer-events-none opacity-0"}`}
-      >
-        <LogoMark size={72} className="animate-pulse" />
-        <p className="pixel text-dim">Tuning channel…</p>
-        <div className="boot-bar w-[min(60vw,320px)] animate-pulse" />
-      </div>
+      {/* animated loader: hides the stage until the 3D packs are in their final place */}
+      <LoadingScreen ready={!loading} minDuration={2200} introKey="pc:intro" />
 
       {/* caption under the active pack, Arc-style */}
       <div

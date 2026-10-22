@@ -638,6 +638,124 @@ body {
   animation: fade-up var(--t-slow) var(--ease-out) both;
 }
 
+/* ─────────────────────────────── Loader ─────────────────────────────── */
+.loader-static {
+  position: absolute;
+  inset: -50%;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: static-jitter 0.35s steps(4) infinite;
+}
+
+@keyframes static-jitter {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-7%, 4%); }
+  50% { transform: translate(5%, -6%); }
+  75% { transform: translate(-3%, 8%); }
+  100% { transform: translate(6%, 2%); }
+}
+
+.loader-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(30% 28% at 50% 42%, rgb(255 203 5 / 0.12), transparent 70%);
+  animation: glow-breathe 2.4s var(--ease-in-out) infinite;
+}
+
+@keyframes glow-breathe {
+  50% { opacity: 0.45; }
+}
+
+/* the catch wobble: drop in, three shakes, a click of the button, repeat */
+.loader-ball-body {
+  transform-box: fill-box;
+  transform-origin: 50% 92%;
+  animation: ball-catch 2.6s var(--ease-in-out) infinite;
+}
+
+@keyframes ball-catch {
+  0%, 12% { transform: rotate(0); }
+  18% { transform: rotate(-22deg); }
+  26% { transform: rotate(16deg); }
+  32% { transform: rotate(0); }
+  42% { transform: rotate(-18deg); }
+  50% { transform: rotate(12deg); }
+  56% { transform: rotate(0); }
+  66% { transform: rotate(-12deg); }
+  73% { transform: rotate(8deg); }
+  78%, 100% { transform: rotate(0); }
+}
+
+.loader-shadow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: shadow-squash 2.6s var(--ease-in-out) infinite;
+}
+
+@keyframes shadow-squash {
+  18%, 42%, 66% { transform: scaleX(0.82); }
+  32%, 56%, 78% { transform: scaleX(1); }
+}
+
+.loader-button {
+  animation: ball-click 2.6s steps(1) infinite;
+}
+
+@keyframes ball-click {
+  0%, 82% { fill: #f8f8f0; }
+  84%, 92% { fill: #ffcb05; filter: drop-shadow(0 0 6px #ffcb05); }
+  94%, 100% { fill: #f8f8f0; }
+}
+
+.loader-hp {
+  border: 2px solid var(--phosphor);
+  border-radius: 3px;
+  padding: 2px;
+  background: #0b0d11;
+}
+
+.loader-hp > div {
+  border-radius: 1px;
+  background-image: repeating-linear-gradient(90deg, transparent 0 6px, rgb(0 0 0 / 0.25) 6px 7px) !important;
+}
+
+.loader-type {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: bottom;
+  width: calc(var(--chars) * 1ch);
+  animation: typewriter 0.9s steps(var(--chars)) both;
+}
+
+@keyframes typewriter {
+  from { width: 0; }
+}
+
+/* CRT switching on: the loader collapses to a bright line, then to nothing */
+.loader-exit {
+  animation: crt-on 0.75s var(--ease-in-out) forwards;
+}
+
+@keyframes crt-on {
+  0% { transform: scale(1, 1); filter: brightness(1); }
+  45% { transform: scale(1, 0.006); filter: brightness(4); }
+  75% { transform: scale(0.02, 0.006); filter: brightness(6); opacity: 1; }
+  100% { transform: scale(0, 0); opacity: 0; }
+}
+
+.loader[data-reduced="true"] .loader-ball-body,
+.loader[data-reduced="true"] .loader-static,
+.loader[data-reduced="true"] .loader-type {
+  animation: none;
+}
+
+.loader[data-reduced="true"].loader-exit {
+  animation: none;
+  opacity: 0;
+  transition: opacity 200ms;
+}
+
 .skeleton {
   background: linear-gradient(90deg, rgb(236 230 214 / 0.04), rgb(236 230 214 / 0.1), rgb(236 230 214 / 0.04));
   background-size: 200% 100%;
