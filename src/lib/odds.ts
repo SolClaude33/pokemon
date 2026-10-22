@@ -13,6 +13,22 @@ export type Card = {
   img: string;
 };
 
+/** A card as listed in the Dex: card data plus where it drops and how often. */
+export type DexCard = {
+  id: string;
+  number: string;
+  name: string;
+  rarity: string;
+  supertype: string;
+  price: number | null;
+  img: string;
+  setId: string;
+  setName: string;
+  packPrice: number;
+  /** expected copies per pack (≈ chance per pack for rare cards) */
+  odds: number;
+};
+
 export type Pull = {
   uid: string;
   card: Card;
@@ -158,10 +174,9 @@ export function drawPack(pack: PackConfig, pool: Pool): Pull[] {
   return pulls;
 }
 
-export const fmtUSD = (n: number) =>
-  n >= 1000
-    ? `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
-    : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** Card and pack values in USDC (1 USDC ≈ 1 USD of TCGplayer market price). */
+export const fmtUSDC = (n: number) =>
+  `${n.toLocaleString("en-US", n >= 1000 ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`;
 
 export const fmtOneIn = (p: number) => {
   if (p <= 0) return "—";

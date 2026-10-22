@@ -10,12 +10,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Repository Guidelines
 
-Holovision: buy and rip real Pokémon TCG booster packs with USDC on BNB Chain, see the odds first, then sell cards back or ship them home. UI copy is English.
+PokéCast (folder/repo still named `holovision`): buy and rip real Pokémon TCG booster packs with USDC on BNB Chain, see the odds first, then sell cards back, trade them on the PokéMart or ship them home. UI copy is English.
 
 ## Structure
-- `src/app` — routes: `/` channel carousel, `/packs/[id]` odds + buy + opening, `/vault`, `/how-it-works`. `layout.tsx` wraps everything in the CRT `TvShell`.
-- `src/components` — `TvShell` (CRT frame + HUD), `PackArc` (arc carousel), `PackStation`/`PackOpening` (buy → tear → reveal → sell), `TcgCard`, `Logo` (SVG mark, no Pokémon marks).
-- `src/lib` — `packs.ts` (lineup, pull rates, buyback/shipping economics — placeholders to confirm), `odds.ts` (slot model, EV, demo draw), `vault.ts` (localStorage demo vault), `wallet.ts` (wagmi/RainbowKit on BSC, USDC `0x8AC7…580d`, 18 decimals).
+- `src/app` — routes: `/` channel carousel, `/packs/[id]` odds + buy + opening, `/dex` card catalog, `/market` PokéMart, `/vault`, `/how-it-works`. `layout.tsx` wraps everything in the CRT `TvShell`.
+- `src/components` — `TvShell` (CRT frame + HUD), `PackArc` (carousel; CSS arc first paint/fallback, `three/ArcCanvas` when WebGL is ready), `PackHero` + `three/PackViewer` (draggable 3D pack), `three/Pack3D` + `packAssets` (pillow geometry, crimp alpha, generated pack back), `PackStation`/`PackOpening` (buy → tear → reveal → sell), `DexView`, `MarketView`, `CardModal`, `TcgCard`, `Logo` (CRT + Poké Ball mark, arched wordmark).
+- `src/lib` — `packs.ts` (lineup, pull rates, buyback/shipping economics — placeholders to confirm), `odds.ts` (slot model, EV, demo draw), `vault.ts` (localStorage demo vault + PokéMart listings), `wallet.ts` (wagmi/RainbowKit on BSC, USDC `0x8AC7…580d`, 18 decimals).
 - `src/data/sets/*.json` — generated card pools (rarity + TCGplayer market price).
 - Assets: served from `public/assets/{cards,packs,sets}` (`/assets/...`); originals + API cache in `assets-src/` (gitignored).
 
@@ -24,13 +24,14 @@ Holovision: buy and rip real Pokémon TCG booster packs with USDC on BNB Chain, 
 - `node scripts/build-catalog.mjs [--skip-images]` — refreshes card data from pokemontcg.io (flaky: retries + caches pages), backfills missing prices from TCGplayer search, downloads pack art (TCGplayer CDN) and converts to webp with ffmpeg.
 
 ## Design tokens (keep)
-Direction: late-night CRT shopping channel (ref. arcmarumo.com). Phosphor type on blue-black glass; only saturated color is holo foil + rarity light. Avoid purple SaaS gradients, rounded app cards, emoji.
-- Colors in `globals.css :root`: `--screen #0b0d11`, `--phosphor #ece6d6`, `--dim`, `--faint`, `--line`, `--signal #ff4433`, `--ok`, `--warn`, `--holo` gradient, rarity `--r-*`.
-- Type: Bodoni Moda italic (display), Fragment Mono (body/HUD, `.hud` uppercase 11px), Silkscreen (`.pixel` labels).
-- Radii: screen 34px, UI 2px; motion `--ease-out` cubic-bezier(.16,1,.3,1), 160/420/900ms; honor reduced motion.
+Direction: late-night CRT channel ripping Pokémon packs, seen through Game Boy-era eyes (ref. arcmarumo.com). Phosphor HUD on blue-black glass; Pokémon yellow/blue/red as brand accents; holo foil for rarity light. Avoid purple SaaS gradients, generic rounded app cards, emoji.
+- Colors in `globals.css :root`: `--screen #0b0d11`, `--phosphor #ece6d6`, `--dim`, `--faint`, `--line`, `--poke-yellow #ffcb05`, `--poke-blue #2a75bb`, `--poke-blue-deep #1b3f78`, `--poke-red/--signal #ee1515`, `--ok`, `--warn`, `--gb-paper`, `--holo`, rarity `--r-*`.
+- Type: Lilita One (display; `.poke-title` = yellow fill + blue outline), Fragment Mono (body/HUD, `.hud` uppercase 11px), Press Start 2P (`.pixel` labels, `.gb-dialog` Game Boy text boxes).
+- Buttons: `.btn-primary` Pokémon yellow with a 3px bottom bevel. Radii: screen 34px, UI 2–4px; motion `--ease-out` cubic-bezier(.16,1,.3,1), 160/420/900ms; honor reduced motion.
+- 3D: React Three Fiber, `flat` (no tone mapping) so printed art keeps its colors; lights from drei Lightformers (no HDR downloads).
 
 ## Conventions & limits
-- Purchases, draws and the vault are DEMO (client-side, no USDC moves). Production needs a contract/escrow and server-side or VRF draws against real inventory.
+- Purchases, draws, the vault and the PokéMart are DEMO (client-side localStorage, no USDC moves; seeded listings are examples). Card values = TCGplayer market price shown as USDC. Production needs a contract/escrow and server-side or VRF draws against real inventory.
 - Pull rates are community estimates; card/pack art is Nintendo/TPC IP — keep sources cited on pack pages.
 - Never commit `.env*`; optional `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`, `NEXT_PUBLIC_BSC_RPC_URL`.
 - `@coinbase/cdp-sdk` is aliased to a stub in `next.config.ts` (unused Base connector dependency).

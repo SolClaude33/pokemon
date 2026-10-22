@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { useAccount } from "wagmi";
-import { fmtUSD } from "@/lib/odds";
+import { fmtUSDC } from "@/lib/odds";
 import { ECONOMICS, buybackFor } from "@/lib/packs";
 import { rarityRank } from "@/lib/rarity";
 import { DEMO_OWNER, canSellBack, requestShipment, sellBack, useVault, type VaultStatus } from "@/lib/vault";
@@ -12,6 +12,7 @@ import { WalletButton, shortAddr } from "./WalletButton";
 
 const TABS: { id: VaultStatus; label: string }[] = [
   { id: "vault", label: "In vault" },
+  { id: "listed", label: "On PokéMart" },
   { id: "shipping", label: "Shipping" },
   { id: "sold", label: "Sold back" },
 ];
@@ -76,12 +77,12 @@ export function VaultView() {
         <div className="flex flex-wrap items-end justify-between gap-6 border-b border-line-strong pb-6">
           <div>
             <p className="pixel text-[10px] text-dim">{address ? `Wallet ${shortAddr(address)}` : "Demo vault · no wallet"}</p>
-            <h1 className="mt-2 font-display text-[clamp(2.2rem,5vw,3.8rem)] leading-none italic">Your vault</h1>
+            <h1 className="poke-title mt-3 text-[clamp(2.4rem,5vw,4rem)] leading-none">Your vault</h1>
           </div>
           <dl className="hud grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
             {[
               ["Cards held", String(inVault.length)],
-              ["Market value", fmtUSD(vaultValue)],
+              ["Market value", fmtUSDC(vaultValue)],
               ["Sold back", `${credited.toFixed(2)} USDC`],
               ["Spent", `${spent.toFixed(2)} USDC`],
             ].map(([k, v]) => (
@@ -130,9 +131,15 @@ export function VaultView() {
         </div>
 
         {items.length === 0 ? (
-          <div className="mt-16 flex flex-col items-center gap-4 text-center">
-            <p className="font-display text-2xl italic text-dim">
-              {tab === "vault" ? "No signal. Your vault is empty." : tab === "shipping" ? "Nothing on the way yet." : "No cards sold back yet."}
+          <div className="mx-auto mt-14 flex max-w-md flex-col items-center gap-5">
+            <p className="gb-dialog w-full">
+              {tab === "vault"
+                ? "No signal. Your vault is empty."
+                : tab === "listed"
+                  ? "Nothing listed on the PokéMart."
+                  : tab === "shipping"
+                    ? "Nothing on the way yet."
+                    : "No cards sold yet."}
             </p>
             {tab === "vault" && (
               <Link href="/" className="btn btn-primary">
@@ -152,10 +159,11 @@ export function VaultView() {
                   <span className="mt-2 block truncate text-[13px]">{it.name}</span>
                   <RarityTag rarity={it.rarity} className="mt-1" />
                   <span className="hud mt-1 flex justify-between text-dim">
-                    <span>{fmtUSD(it.value)}</span>
+                    <span>{fmtUSDC(it.value)}</span>
                     {it.status === "vault" && <span className={on ? "text-ok" : ""}>{on ? "■ Selected" : "□ Select"}</span>}
-                    {it.status === "sold" && <span>Sold {fmtUSD(it.soldFor ?? 0)}</span>}
+                    {it.status === "sold" && <span>Sold {fmtUSDC(it.soldFor ?? 0)}</span>}
                     {it.status === "shipping" && <span>{it.shipmentId}</span>}
+                    {it.status === "listed" && <span className="text-poke-yellow">Listed</span>}
                   </span>
                   <span className="hud mt-0.5 block text-faint">
                     {it.setName}
@@ -193,6 +201,9 @@ export function VaultView() {
                 <button type="button" className="btn btn-ghost hud" onClick={() => setSelected(new Set(inVault.map((i) => i.uid)))}>
                   Select all
                 </button>
+                <Link href="/market" className="btn">
+                  List on PokéMart
+                </Link>
                 <button type="button" className="btn" disabled={!chosen.length} onClick={() => setShipOpen(true)}>
                   Ship home
                 </button>
@@ -236,7 +247,7 @@ export function VaultView() {
 
         {state.ledger.length > 0 && (
           <section aria-labelledby="ledger" className="mt-20">
-            <h2 id="ledger" className="font-display text-2xl italic">
+            <h2 id="ledger" className="font-display text-2xl">
               Ledger
             </h2>
             <ol className="mt-4 border-t border-line">

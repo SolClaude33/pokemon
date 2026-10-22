@@ -14,6 +14,7 @@ export default function Home() {
       price: p.price,
       tagline: p.tagline,
       packImage: p.set.packImage,
+      logo: p.set.logo,
       accent: p.accent,
       ev: expectedValue(p, buildPool(cards)),
       topHit: top ? { name: top.name, price: top.price ?? 0 } : null,

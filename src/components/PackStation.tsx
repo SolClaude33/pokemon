@@ -1,11 +1,12 @@
 "use client";
 
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useMounted } from "@/lib/useClient";
 import { useAccount } from "wagmi";
 import { bsc } from "wagmi/chains";
-import { buildPool, drawPack, fmtUSD, type Card, type Pull } from "@/lib/odds";
+import { buildPool, drawPack, fmtUSDC, type Card, type Pull } from "@/lib/odds";
 import { ECONOMICS, type PackConfig } from "@/lib/packs";
 import { DEMO_OWNER, recordPack } from "@/lib/vault";
 import { PackOpening } from "./PackOpening";
@@ -21,12 +22,6 @@ type Props = {
 
 type Status = "idle" | "processing" | "error";
 
-const useMounted = () =>
-  useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
 
 export function PackStation({ pack, cards, setName, packImage, ev }: Props) {
   const { address, chainId, isConnected } = useAccount();
@@ -74,13 +69,13 @@ export function PackStation({ pack, cards, setName, packImage, ev }: Props) {
     <div className="border border-line bg-[#0b0d11]/70 p-5 backdrop-blur-sm">
       <div className="flex items-baseline justify-between gap-4">
         <p className="hud text-dim">1 sealed booster · 10 cards</p>
-        <p className="font-display text-3xl italic">
+        <p className="font-display text-3xl">
           {pack.price.toFixed(2)} <span className="hud not-italic text-dim">USDC</span>
         </p>
       </div>
       <dl className="hud mt-4 grid grid-cols-2 gap-y-2 border-t border-line pt-4 text-dim">
         <dt>Expected value</dt>
-        <dd className="text-right text-phosphor">{fmtUSD(ev)}</dd>
+        <dd className="text-right text-phosphor">{fmtUSDC(ev)}</dd>
         <dt>Instant buyback</dt>
         <dd className="text-right text-phosphor">{Math.round(ECONOMICS.buybackRate * 100)}% of market</dd>
         <dt>Ship home</dt>

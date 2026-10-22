@@ -42,7 +42,7 @@ const connectors = connectorsForWallets(
     { groupName: "Popular on BNB Chain", wallets: recommended },
     { groupName: "More", wallets: hasWalletConnect ? [...others, walletConnectWallet] : others },
   ],
-  { appName: "Holovision", projectId: projectId || "holovision-local" },
+  { appName: "PokéCast", projectId: projectId || "pokecast-local" },
 );
 
 export const wagmiConfig = createConfig({

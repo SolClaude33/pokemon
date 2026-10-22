@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fmtUSD, type Pull } from "@/lib/odds";
+import { fmtUSDC, type Pull } from "@/lib/odds";
 import { buybackFor } from "@/lib/packs";
 import { rarityMeta } from "@/lib/rarity";
 import { sellBack } from "@/lib/vault";
@@ -224,15 +224,20 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
             <div className="min-h-[3.5rem] text-center" aria-live="polite">
               {current && !suspense && (
                 <div key={current.uid} className="fade-up">
-                  {isHit(current) && <p className="pixel mb-1 text-xs holo-text">Hit on air</p>}
-                  <p className="font-display text-xl italic">{current.card.name}</p>
+                  {isHit(current) ? (
+                    <p className="gb-dialog mb-3 max-w-[34ch]" data-more="true">
+                      Wow! You pulled {current.card.name.toUpperCase()}!
+                    </p>
+                  ) : (
+                    <p className="font-display text-xl">{current.card.name}</p>
+                  )}
                   <p className="mt-1 flex items-center justify-center gap-3">
                     <RarityTag rarity={current.rarity} />
-                    <span className="hud text-dim">{fmtUSD(current.value)}</span>
+                    <span className="hud text-dim">{fmtUSDC(current.value)}</span>
                   </p>
                 </div>
               )}
-              {suspense && <p className="pixel text-xs text-warn">Something shiny…</p>}
+              {suspense && <p className="pixel text-warn">What? Something shiny…</p>}
             </div>
 
             <div className="flex items-center gap-3">
@@ -253,7 +258,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
               <span>
                 {String(shown).padStart(2, "0")} / {pulls.length}
               </span>
-              <span>Value {fmtUSD(revealedValue)}</span>
+              <span>Value {fmtUSDC(revealedValue)}</span>
             </div>
             <ol className="flex flex-col border-t border-line">
               {pulls.map((p, i) => (
@@ -266,7 +271,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
                         </span>
                         <span className="truncate normal-case">{p.card.name}</span>
                       </span>
-                      <span className="text-dim tabular-nums">{fmtUSD(p.value)}</span>
+                      <span className="text-dim tabular-nums">{fmtUSDC(p.value)}</span>
                     </>
                   ) : (
                     <span className="text-faint">— {p.slot}</span>
@@ -284,17 +289,17 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
           <div className="fade-up flex flex-wrap items-end justify-between gap-6 border-b border-line pb-6">
             <div>
               <p className="pixel text-[10px] text-dim">Rip complete · {setName}</p>
-              <h2 className="mt-2 font-display text-[clamp(1.8rem,4vw,3rem)] leading-none italic">
-                {fmtUSD(total)} <span className="text-dim">pulled</span>
+              <h2 className="poke-title mt-3 text-[clamp(2rem,4.4vw,3.2rem)] leading-none">
+                {fmtUSDC(total)} <span className="text-dim">pulled</span>
               </h2>
               <p className="hud mt-3 text-dim">
-                {demo ? "Free demo rip" : `Paid ${price.toFixed(2)} USDC`} · Best pull {best.card.name} ({fmtUSD(best.value)})
+                {demo ? "Free demo rip" : `Paid ${price.toFixed(2)} USDC`} · Best pull {best.card.name} ({fmtUSDC(best.value)})
                 {!demo && (
                   <>
                     {" "}·{" "}
                     <span className={total >= price ? "text-ok" : "text-dim"}>
                       {total >= price ? "+" : "−"}
-                      {fmtUSD(Math.abs(total - price))} vs pack
+                      {fmtUSDC(Math.abs(total - price))} vs pack
                     </span>
                   </>
                 )}
@@ -327,9 +332,9 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
                       <span className="block truncate text-[13px]">{p.card.name}</span>
                       <RarityTag rarity={p.rarity} className="mt-1" />
                       <span className="hud mt-1 flex items-center justify-between text-dim">
-                        <span>{fmtUSD(p.value)}</span>
+                        <span>{fmtUSDC(p.value)}</span>
                         <span className={on ? "text-ok" : "group-hover:text-phosphor"}>
-                          {on ? "■" : "□"} Sell {fmtUSD(buybackFor(p.value))}
+                          {on ? "■" : "□"} Sell {fmtUSDC(buybackFor(p.value))}
                         </span>
                       </span>
                     </span>
@@ -344,7 +349,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
               <p className="hud text-dim">
                 {selected.size ? (
                   <>
-                    {selected.size} selected · instant buyback <span className="text-phosphor">{fmtUSD(selectedValue)} USDC</span>
+                    {selected.size} selected · instant buyback <span className="text-phosphor">{fmtUSDC(selectedValue)}</span>
                   </>
                 ) : (
                   "Unselected cards stay in your vault. Ship them home anytime."
@@ -370,7 +375,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
                     setPhase("done");
                   }}
                 >
-                  Sell back {selected.size || ""} for {fmtUSD(selectedValue)}
+                  Sell back {selected.size || ""} for {fmtUSDC(selectedValue)}
                 </button>
               </div>
             </div>
@@ -382,7 +387,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
       {phase === "done" && result && (
         <div className="flex min-h-full flex-col items-center justify-center gap-5 px-6 py-24 text-center">
           <p className="pixel text-[10px] text-ok">Transmission received</p>
-          <h2 className="fade-up max-w-[22ch] font-display text-[clamp(1.8rem,4vw,3rem)] leading-tight italic">
+          <h2 className="poke-title fade-up max-w-[22ch] text-[clamp(2rem,4.4vw,3.2rem)] leading-tight">
             {result.count
               ? `${result.total.toFixed(2)} USDC credited for ${result.count} card${result.count > 1 ? "s" : ""}.`
               : "All 10 cards are in your vault."}

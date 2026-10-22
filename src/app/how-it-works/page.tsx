@@ -13,7 +13,7 @@ const STEPS = [
   {
     n: "02",
     title: "Read the odds first",
-    body: "Each pack page shows the chance of every rarity per pack, the chase cards and the pack's expected value at TCGplayer market prices — before you pay a cent.",
+    body: "Each pack page shows the chance of every rarity per pack, the chase cards and the pack's expected value at TCGplayer market prices — before you pay a cent. The Card Dex lists every card you can pull, with its odds.",
   },
   {
     n: "03",
@@ -27,6 +27,11 @@ const STEPS = [
   },
   {
     n: "05",
+    title: "Trade on the PokéMart",
+    body: `List any card from your vault at your own price, or buy the exact card you're chasing from other collectors. Sellers pay a ${ECONOMICS.marketFee * 100}% fee; the card changes vaults instantly.`,
+  },
+  {
+    n: "06",
     title: "Ship it or sell it back",
     body: `Keep cards in your vault and ship them home for a flat ${ECONOMICS.shippingFee} USDC per shipment, or sell any card back instantly for ${Math.round(
       ECONOMICS.buybackRate * 100,
@@ -58,7 +63,7 @@ export default function HowItWorks() {
     <div className="channel-scroll">
       <article className="mx-auto max-w-5xl px-[clamp(16px,3.4vw,40px)] pt-[clamp(96px,15vh,140px)] pb-[clamp(80px,12vh,120px)]">
         <p className="pixel text-[10px] text-dim">Program guide</p>
-        <h1 className="mt-3 max-w-[16ch] font-display text-[clamp(2.4rem,6vw,4.8rem)] leading-[0.95] italic">
+        <h1 className="poke-title mt-4 max-w-[16ch] text-[clamp(2.6rem,6vw,5rem)] leading-[0.95]">
           Real packs. Live odds. Your call.
         </h1>
 
@@ -66,14 +71,14 @@ export default function HowItWorks() {
           {STEPS.map((s) => (
             <li key={s.n} className="grid gap-3 border-b border-line py-8 sm:grid-cols-[80px_minmax(0,1fr)_minmax(0,1.4fr)] sm:gap-8">
               <span className="pixel text-xs text-dim">{s.n}</span>
-              <h2 className="font-display text-2xl italic">{s.title}</h2>
+              <h2 className="font-display text-2xl text-poke-yellow">{s.title}</h2>
               <p className="leading-relaxed text-phosphor/85">{s.body}</p>
             </li>
           ))}
         </ol>
 
         <section aria-labelledby="faq" className="mt-20">
-          <h2 id="faq" className="font-display text-[clamp(1.8rem,3.6vw,2.8rem)] italic">
+          <h2 id="faq" className="font-display text-[clamp(1.8rem,3.6vw,2.8rem)]">
             Questions
           </h2>
           <div className="mt-6 border-t border-line">
@@ -101,7 +106,7 @@ export default function HowItWorks() {
         </div>
 
         <p className="hud mt-16 leading-relaxed text-faint">
-          Holovision is not affiliated with, endorsed by or sponsored by Nintendo, The Pokémon Company, Creatures or GAME FREAK. Pokémon
+          PokéCast is not affiliated with, endorsed by or sponsored by Nintendo, The Pokémon Company, Creatures or GAME FREAK. Pokémon
           and card artwork are trademarks of their respective owners. Card data from pokemontcg.io; prices and pack images from TCGplayer.
         </p>
       </article>

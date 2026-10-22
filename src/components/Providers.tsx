@@ -23,7 +23,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={theme} modalSize="compact" locale="en-US" appInfo={{ appName: "Holovision" }}>
+        <RainbowKitProvider theme={theme} modalSize="compact" locale="en-US" appInfo={{ appName: "PokéCast" }}>
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>

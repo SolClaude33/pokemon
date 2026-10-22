@@ -1,10 +1,14 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { fmtUSD } from "@/lib/odds";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { fmtUSDC } from "@/lib/odds";
+import { useReducedMotion, useWebGL } from "@/lib/useClient";
 import { PackArt } from "./PackArt";
+
+const ArcCanvas = dynamic(() => import("./three/ArcCanvas"), { ssr: false });
 
 export type ArcPack = {
   setId: string;
@@ -14,6 +18,7 @@ export type ArcPack = {
   price: number;
   tagline: string;
   packImage: string;
+  logo: string;
   accent: string;
   ev: number;
   topHit: { name: string; price: number } | null;
@@ -33,8 +38,16 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
   const router = useRouter();
   const [active, setActive] = useState(0);
   const [hint, setHint] = useState(true);
+  const [ready3d, setReady3d] = useState(false);
+  const webgl = useWebGL();
+  const reducedMotion = useReducedMotion();
   const touch = useRef<number | null>(null);
   const n = packs.length;
+  const onReady = useCallback(() => setReady3d(true), []);
+  const specs = useMemo(
+    () => packs.map((p) => ({ setId: p.setId, setName: p.name, packImage: p.packImage, logo: p.logo, accent: p.accent })),
+    [packs],
+  );
   const current = packs[active];
 
   const go = useCallback((delta: number) => {
@@ -80,7 +93,22 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
         }}
       />
 
-      <div className="arc-stage">
+      {webgl && (
+        <ArcCanvas
+          packs={specs}
+          active={active}
+          reducedMotion={reducedMotion}
+          onReady={onReady}
+          onSelect={(i) => {
+            setHint(false);
+            setActive(i);
+          }}
+          onOpen={(i) => router.push(`/packs/${packs[i].setId}`)}
+        />
+      )}
+
+      {/* CSS arc: first paint, and the fallback without WebGL */}
+      <div className={`arc-stage transition-opacity duration-500 ${ready3d ? "invisible opacity-0" : ""}`}>
         {packs.map((p, i) => {
           const d = offset(i, active, n);
           const ad = Math.abs(d);
@@ -128,19 +156,19 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
           <p className="pixel text-[10px] text-dim">
             CH {pad2(current.channel)} · {current.series}
           </p>
-          <h1 className="mt-1 font-display text-[clamp(1.6rem,3.2vw,2.4rem)] leading-none italic">{current.name}</h1>
+          <h1 className="poke-title mt-2 text-[clamp(1.9rem,3.6vw,2.8rem)] leading-none [text-shadow:none]">{current.name}</h1>
           <p className="hud mt-3 max-w-[38ch] text-phosphor/85">{current.tagline}</p>
           <p className="hud mt-2 flex flex-wrap justify-center gap-x-3 text-dim">
             <span>
               Pack <span className="text-phosphor">{current.price.toFixed(2)} USDC</span>
             </span>
             <span aria-hidden="true">•</span>
-            <span>EV {fmtUSD(current.ev)}</span>
+            <span>EV {fmtUSDC(current.ev)}</span>
             {current.topHit && (
               <>
                 <span aria-hidden="true" className="hidden sm:inline">•</span>
                 <span className="hidden sm:inline">
-                  Top hit {current.topHit.name} {fmtUSD(current.topHit.price)}
+                  Top hit {current.topHit.name} {fmtUSDC(current.topHit.price)}
                 </span>
               </>
             )}

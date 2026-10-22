@@ -1,14 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Bodoni_Moda, Fragment_Mono, Silkscreen } from "next/font/google";
+import { Fragment_Mono, Lilita_One, Press_Start_2P } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import { TvShell } from "@/components/TvShell";
 import "./globals.css";
 
-const bodoni = Bodoni_Moda({
-  variable: "--font-bodoni",
+const lilita = Lilita_One({
+  variable: "--font-lilita",
   subsets: ["latin"],
-  style: ["normal", "italic"],
-  axes: ["opsz"],
+  weight: "400",
 });
 
 const fragment = Fragment_Mono({
@@ -17,16 +16,16 @@ const fragment = Fragment_Mono({
   weight: "400",
 });
 
-const silkscreen = Silkscreen({
-  variable: "--font-silkscreen",
+const pressStart = Press_Start_2P({
+  variable: "--font-pressstart",
   subsets: ["latin"],
   weight: "400",
 });
 
 export const metadata: Metadata = {
-  title: { default: "Holovision — Rip real Pokémon TCG packs", template: "%s · Holovision" },
+  title: { default: "PokéCast — Rip real Pokémon TCG packs", template: "%s · PokéCast" },
   description:
-    "Buy and open real, sealed Pokémon TCG booster packs with USDC on BNB Chain. See the odds before you rip, then ship your cards home or sell them back instantly.",
+    "Buy and open real, sealed Pokémon TCG booster packs with USDC on BNB Chain. See the odds before you rip, then ship your cards home, sell them back instantly or trade them on the PokéMart.",
 };
 
 export const viewport: Viewport = {
@@ -36,7 +35,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${bodoni.variable} ${fragment.variable} ${silkscreen.variable}`}>
+    <html lang="en" className={`${lilita.variable} ${fragment.variable} ${pressStart.variable}`}>
       <body>
         <Providers>
           <TvShell>{children}</TvShell>

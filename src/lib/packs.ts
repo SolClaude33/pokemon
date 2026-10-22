@@ -13,6 +13,8 @@ export const ECONOMICS = {
   shippingFee: 6,
   /** sell-back window after a pull, in hours */
   buybackWindowHours: 72,
+  /** PokéMart fee taken from the seller on each sale */
+  marketFee: 0.025,
 } as const;
 
 /** Key used in slot tables for a reverse-holo copy of a Common/Uncommon/Rare. */

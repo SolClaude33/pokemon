@@ -1,4 +1,4 @@
-# Holovision
+# PokéCast
 
 Rip real Pokémon TCG booster packs with USDC on BNB Chain. See the odds before you open, then ship your cards home or sell them back instantly.
 

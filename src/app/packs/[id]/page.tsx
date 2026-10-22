@@ -3,11 +3,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { PackArt } from "@/components/PackArt";
+import { PackHero } from "@/components/PackHero";
 import { PackStation } from "@/components/PackStation";
 import { RarityTag, TcgCard } from "@/components/TcgCard";
 import { catalogGeneratedAt, getPack, listPacks } from "@/lib/catalog";
-import { buildPool, cardOdds, chaseCards, expectedValue, fmtOneIn, fmtPct, fmtUSD, rarityOdds } from "@/lib/odds";
+import { buildPool, cardOdds, chaseCards, expectedValue, fmtOneIn, fmtPct, fmtUSDC, rarityOdds } from "@/lib/odds";
 import { ECONOMICS } from "@/lib/packs";
 import { rarityMeta } from "@/lib/rarity";
 
@@ -75,7 +75,7 @@ function PackContent({ id }: { id: string }) {
         {/* hero */}
         <div className="mt-6 grid items-start gap-10 md:grid-cols-[minmax(220px,320px)_1fr] lg:gap-16">
           <div className="mx-auto w-[min(62vw,320px)] md:sticky md:top-28 md:w-full">
-            <PackArt src={pack.set.packImage} alt={`${pack.set.name} booster pack`} priority sizes="(max-width: 768px) 62vw, 320px" />
+            <PackHero pack={{ setId: pack.setId, setName: pack.set.name, packImage: pack.set.packImage, logo: pack.set.logo, accent: pack.accent }} />
           </div>
 
           <div className="fade-up">
@@ -84,7 +84,7 @@ function PackContent({ id }: { id: string }) {
                 ["Channel", pad2(pack.channel)],
                 ["Released", pack.set.releaseDate.replaceAll("/", ".")],
                 ["Cards in set", String(pack.set.cardCount)],
-                ["Sealed market", pack.set.packMarketPrice ? fmtUSD(pack.set.packMarketPrice) : "—"],
+                ["Sealed market", pack.set.packMarketPrice ? fmtUSDC(pack.set.packMarketPrice) : "—"],
               ].map(([k, v]) => (
                 <div key={k}>
                   <dt className="text-faint">[{k}]</dt>
@@ -101,7 +101,7 @@ function PackContent({ id }: { id: string }) {
               className="mt-8 h-auto w-[min(260px,60%)] opacity-90"
               aria-hidden="true"
             />
-            <h1 className="mt-4 font-display text-[clamp(2.2rem,5.4vw,4.2rem)] leading-[0.95] tracking-[-0.01em] italic">
+            <h1 className="poke-title mt-4 text-[clamp(2.4rem,5.4vw,4.4rem)] leading-[0.95]">
               {pack.set.name}
             </h1>
             <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed text-phosphor/85">{pack.tagline}</p>
@@ -111,12 +111,12 @@ function PackContent({ id }: { id: string }) {
               <div className="flex flex-col justify-between gap-6 border-l border-line pl-6">
                 <div>
                   <p className="hud text-faint">[Chance of a hit]</p>
-                  <p className="mt-1 font-display text-4xl italic">{fmtPct(hitChance)}</p>
+                  <p className="mt-1 font-display text-4xl">{fmtPct(hitChance)}</p>
                   <p className="hud mt-1 text-dim">Double Rare or better · {fmtOneIn(hitChance)}</p>
                 </div>
                 <div>
                   <p className="hud text-faint">[Sell-back EV]</p>
-                  <p className="mt-1 font-display text-4xl italic">{fmtUSD(ev * ECONOMICS.buybackRate)}</p>
+                  <p className="mt-1 font-display text-4xl">{fmtUSDC(ev * ECONOMICS.buybackRate)}</p>
                   <p className="hud mt-1 text-dim">If you sold every card back</p>
                 </div>
               </div>
@@ -129,7 +129,7 @@ function PackContent({ id }: { id: string }) {
           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line-strong pb-4">
             <div>
               <p className="pixel text-[10px] text-dim">Before you rip</p>
-              <h2 id="odds" className="mt-2 font-display text-[clamp(1.8rem,3.6vw,2.8rem)] leading-none italic">
+              <h2 id="odds" className="mt-2 font-display text-[clamp(1.8rem,3.6vw,2.8rem)] leading-none">
                 The odds, on air
               </h2>
             </div>
@@ -172,7 +172,7 @@ function PackContent({ id }: { id: string }) {
                       </span>
                     </td>
                     <td className="hud py-3 text-dim">{fmtOneIn(o.perPack)}</td>
-                    <td className="hud py-3 text-right tabular-nums">{fmtUSD(o.avgValue)}</td>
+                    <td className="hud py-3 text-right tabular-nums">{fmtUSDC(o.avgValue)}</td>
                     <td className="hud max-w-[22ch] truncate py-3 pl-6 text-right normal-case text-dim">
                       {o.top ? o.top.name : "—"}
                     </td>
@@ -186,10 +186,15 @@ function PackContent({ id }: { id: string }) {
         {/* chase */}
         <section aria-labelledby="chase" className="mt-24">
           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line-strong pb-4">
-            <h2 id="chase" className="font-display text-[clamp(1.8rem,3.6vw,2.8rem)] leading-none italic">
+            <h2 id="chase" className="font-display text-[clamp(1.8rem,3.6vw,2.8rem)] leading-none">
               Chase cards
             </h2>
-            <p className="hud text-dim">Odds for that exact card, per pack</p>
+            <p className="hud flex gap-4 text-dim">
+              Odds for that exact card, per pack
+              <Link href={`/dex?pack=${pack.setId}`} className="link-hud text-poke-yellow">
+                All {pack.set.cardCount} cards in the Dex →
+              </Link>
+            </p>
           </div>
           <ul className="mt-8 grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-6">
             {chase.map((c) => (
@@ -198,7 +203,7 @@ function PackContent({ id }: { id: string }) {
                 <p className="mt-3 truncate text-[13px]">{c.name}</p>
                 <RarityTag rarity={c.rarity} className="mt-1" />
                 <p className="hud mt-1 flex justify-between text-dim">
-                  <span className="text-phosphor">{fmtUSD(c.price ?? 0)}</span>
+                  <span className="text-phosphor">{fmtUSDC(c.price ?? 0)}</span>
                   <span>{fmtOneIn(cardOdds(c, odds))}</span>
                 </p>
               </li>

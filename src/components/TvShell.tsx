@@ -61,9 +61,13 @@ function BootScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
-const NAV = [
-  { href: "/vault", label: "Vault" },
-  { href: "/how-it-works", label: "How it works" },
+const NAV_LEFT = [
+  { href: "/dex", label: "Dex", short: "Dex" },
+  { href: "/market", label: "PokéMart", short: "Mart" },
+];
+const NAV_RIGHT = [
+  { href: "/vault", label: "Vault", short: "Vault" },
+  { href: "/how-it-works", label: "How it works", short: "Info" },
 ];
 
 export function TvShell({ children }: { children: ReactNode }) {
@@ -91,17 +95,27 @@ export function TvShell({ children }: { children: ReactNode }) {
           <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-[clamp(16px,3.4vw,40px)] pt-[clamp(14px,3.2vh,34px)] sm:grid sm:grid-cols-[1fr_auto_1fr]">
             <div className="hud pointer-events-auto hidden items-center gap-5 sm:flex">
               <Link href="/" className="link-hud" aria-current={pathname === "/" ? "page" : undefined}>
-                Home
+                Packs
               </Link>
-              <span className="hidden text-dim tabular-nums lg:inline" aria-label="Time on channel">
+              {NAV_LEFT.map((n) => (
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  className="link-hud hidden md:inline"
+                  aria-current={pathname.startsWith(n.href) ? "page" : undefined}
+                >
+                  {n.label}
+                </Link>
+              ))}
+              <span className="hidden text-dim tabular-nums xl:inline" aria-label="Time on channel">
                 {timer}
               </span>
             </div>
-            <Link href="/" className="pointer-events-auto" aria-label="Holovision home">
+            <Link href="/" className="pointer-events-auto" aria-label="PokéCast home">
               <Logo />
             </Link>
             <nav aria-label="Main" className="hud pointer-events-auto flex items-center justify-end gap-5">
-              {NAV.map((n) => (
+              {NAV_RIGHT.map((n) => (
                 <Link
                   key={n.href}
                   href={n.href}
@@ -118,7 +132,7 @@ export function TvShell({ children }: { children: ReactNode }) {
           {/* bottom HUD */}
           <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-[clamp(16px,3.4vw,40px)] pb-[clamp(14px,3.2vh,34px)]">
             <div className="hud pointer-events-auto flex items-center gap-5 text-dim">
-              <span className="tabular-nums" suppressHydrationWarning>
+              <span className="hidden tabular-nums sm:inline" suppressHydrationWarning>
                 {clock}
               </span>
               <button
@@ -131,9 +145,9 @@ export function TvShell({ children }: { children: ReactNode }) {
               </button>
             </div>
             <div className="hud pointer-events-auto flex items-center gap-5 text-dim">
-              {NAV.map((n) => (
-                <Link key={n.href} href={n.href} className="link-hud md:hidden">
-                  {n.label === "How it works" ? "Info" : n.label}
+              {[...NAV_LEFT, ...NAV_RIGHT].map((n) => (
+                <Link key={n.href} href={n.href} className="link-hud md:hidden" aria-current={pathname.startsWith(n.href) ? "page" : undefined}>
+                  {n.short}
                 </Link>
               ))}
               <span className="hidden items-center gap-2 sm:flex">
