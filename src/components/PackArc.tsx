@@ -164,7 +164,7 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
       )}
 
       {/* animated loader: hides the stage until the 3D packs are in their final place */}
-      <LoadingScreen ready={!loading} minDuration={2200} introKey="pc:intro" />
+      <LoadingScreen ready={!loading} minDuration={4000} introKey="pc:intro" />
 
       {/* caption under the active pack, Arc-style */}
       <div

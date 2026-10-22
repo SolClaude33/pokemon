@@ -56,7 +56,8 @@ export function LoadingScreen({ ready, minDuration = 0, introKey }: { ready: boo
           return;
         }
       } else {
-        setProgress(0.9 * (1 - Math.exp(-t / 1400)));
+        // slower climb when there is a long intro to fill
+        setProgress(0.9 * (1 - Math.exp(-t / Math.max(1400, min / 2.2))));
       }
       raf = requestAnimationFrame(tick);
     };
