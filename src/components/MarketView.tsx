@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { fmtUSDC } from "@/lib/odds";
+import { sfx } from "@/lib/audio";
 import { ECONOMICS, buybackFor } from "@/lib/packs";
 import { rarityMeta, rarityRank } from "@/lib/rarity";
 import { DEMO_OWNER, buyListing, cancelListing, listForSale, marketFee, useMarket, useVault, type Listing, type VaultItem } from "@/lib/vault";
@@ -85,8 +86,10 @@ export function MarketView({
     if (!open) return;
     try {
       buyListing(owner, open);
+      sfx.coin();
       setResult({ tone: "ok", text: `You got ${open.name}! It's waiting in your vault.` });
     } catch (e) {
+      sfx.error();
       setResult({ tone: "error", text: e instanceof Error ? e.message : "Purchase failed" });
     }
     setConfirm(false);
@@ -174,7 +177,14 @@ export function MarketView({
             <ul className="mt-8 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
               {listings.map((l) => (
                 <li key={l.id}>
-                  <button type="button" onClick={() => setOpen(l)} className="group block w-full cursor-pointer text-left">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.select();
+                      setOpen(l);
+                    }}
+                    className="group block w-full cursor-pointer text-left"
+                  >
                     <span className="block transition-transform duration-300 group-hover:-translate-y-1">
                       <TcgCard img={l.img} name={l.name} rarity={l.rarity} reverse={l.reverse} glow={rarityMeta(l.rarity).hit} sizes="(max-width: 640px) 45vw, 200px" />
                     </span>
@@ -340,6 +350,7 @@ function SellPanel({ owner, items, connected, onListed }: { owner: string; items
               }
               try {
                 listForSale(owner, pick.uid, n);
+                sfx.coin();
                 setPick(null);
                 onListed();
               } catch (err) {

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtUSDC, type Pull } from "@/lib/odds";
+import { sfx } from "@/lib/audio";
 import { buybackFor } from "@/lib/packs";
 import { rarityMeta } from "@/lib/rarity";
 import { sellBack } from "@/lib/vault";
@@ -25,6 +26,14 @@ type Props = {
 
 const isHit = (p: Pull) => !p.reverse && rarityMeta(p.rarity).hit;
 
+/** fanfare size: 1 double rare / holo / IR, 2 ultra, 3 SIR, 4 gold */
+function hitTier(rarity: string) {
+  if (/Hyper/.test(rarity)) return 4;
+  if (rarity === "Special Illustration Rare") return 3;
+  if (rarity === "Ultra Rare" || rarity === "Mega Attack Rare") return 2;
+  return 1;
+}
+
 export function PackOpening({ owner, demo = false, pulls, packImage, setName, price, onClose, onAgain }: Props) {
   const [phase, setPhase] = useState<Phase>("sealed");
   const [shown, setShown] = useState(0); // number of cards revealed
@@ -40,23 +49,28 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
   const tear = useCallback(() => {
     if (phase !== "sealed") return;
     setPhase("tearing");
+    sfx.tear();
     setTimeout(() => setPhase("reveal"), 1050);
   }, [phase]);
 
   const next = useCallback(() => {
     if (phase !== "reveal" || suspense) return;
     if (shown >= pulls.length) {
+      sfx.select();
       setPhase("summary");
       return;
     }
     const upcoming = pulls[shown];
     if (isHit(upcoming)) {
       setSuspense(true);
+      sfx.suspense(900);
       setTimeout(() => {
         setSuspense(false);
         setShown((s) => s + 1);
+        sfx.hit(hitTier(upcoming.rarity));
       }, 900);
     } else {
+      sfx.flip();
       setShown((s) => s + 1);
     }
   }, [phase, suspense, shown, pulls]);
@@ -245,7 +259,14 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
                 {shown >= pulls.length ? "See results" : shown === 0 ? "Reveal first card" : "Next card"}
               </button>
               {shown < pulls.length && (
-                <button type="button" onClick={() => setPhase("summary")} className="btn btn-ghost hud">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.select();
+                    setPhase("summary");
+                  }}
+                  className="btn btn-ghost hud"
+                >
                   Reveal all
                 </button>
               )}
@@ -372,6 +393,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
                   disabled={!selected.size}
                   onClick={() => {
                     setResult(sellBack(owner, [...selected]));
+                    sfx.coin();
                     setPhase("done");
                   }}
                 >

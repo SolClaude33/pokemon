@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtUSDC } from "@/lib/odds";
+import { sfx } from "@/lib/audio";
 import { useMounted, useReducedMotion, useWebGL } from "@/lib/useClient";
 import { LoadingScreen } from "./LoadingScreen";
 import { PackArt } from "./PackArt";
@@ -59,6 +60,7 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
   const current = packs[active];
 
   const go = useCallback((delta: number) => {
+    sfx.click();
     setHint(false);
     setActive((a) => (a + delta + n) % n);
   }, [n]);
@@ -79,7 +81,10 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
       if (el?.closest("input, textarea, select, [role=dialog]")) return;
       if (e.key === "ArrowRight") go(1);
       else if (e.key === "ArrowLeft") go(-1);
-      else if (e.key === "Enter" && !el?.closest("a, button")) router.push(`/packs/${packs[active].setId}`);
+      else if (e.key === "Enter" && !el?.closest("a, button")) {
+        sfx.select();
+        router.push(`/packs/${packs[active].setId}`);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -115,10 +120,14 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
           reducedMotion={reducedMotion}
           onReady={onReady}
           onSelect={(i) => {
+            sfx.click();
             setHint(false);
             setActive(i);
           }}
-          onOpen={(i) => router.push(`/packs/${packs[i].setId}`)}
+          onOpen={(i) => {
+            sfx.select();
+            router.push(`/packs/${packs[i].setId}`);
+          }}
         />
         </div>
       )}
@@ -199,7 +208,7 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
           <button type="button" onClick={() => go(-1)} className="btn btn-ghost hud" aria-label="Previous pack">
             ←
           </button>
-          <Link href={`/packs/${current.setId}`} className="btn btn-primary">
+          <Link href={`/packs/${current.setId}`} className="btn btn-primary" onClick={() => sfx.select()}>
             Tune in · View odds
           </Link>
           <button type="button" onClick={() => go(1)} className="btn btn-ghost hud" aria-label="Next pack">

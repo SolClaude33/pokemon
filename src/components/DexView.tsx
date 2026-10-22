@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDeferredValue, useMemo, useState } from "react";
 import { fmtOneIn, fmtUSDC, type DexCard } from "@/lib/odds";
+import { sfx } from "@/lib/audio";
 import { RARITY_ORDER, rarityMeta, rarityRank } from "@/lib/rarity";
 import { CardModal } from "./CardModal";
 import { RarityTag, TcgCard } from "./TcgCard";
@@ -67,7 +68,8 @@ export function DexView({ cards, packs }: { cards: DexCard[]; packs: { id: strin
     router.replace(`/dex${sp.size ? `?${sp}` : ""}`, { scroll: false });
   };
 
-  const toggleRarity = (r: string) =>
+  const toggleRarity = (r: string) => {
+    sfx.click();
     setRarities((s) => {
       const n = new Set(s);
       if (n.has(r)) n.delete(r);
@@ -75,6 +77,7 @@ export function DexView({ cards, packs }: { cards: DexCard[]; packs: { id: strin
       setLimit(PAGE);
       return n;
     });
+  };
 
   return (
     <>
@@ -175,7 +178,14 @@ export function DexView({ cards, packs }: { cards: DexCard[]; packs: { id: strin
         <ul className="mt-6 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {list.slice(0, limit).map((c) => (
             <li key={c.id}>
-              <button type="button" onClick={() => setOpen(c)} className="group block w-full cursor-pointer text-left">
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.select();
+                  setOpen(c);
+                }}
+                className="group block w-full cursor-pointer text-left"
+              >
                 <span className="block transition-transform duration-300 group-hover:-translate-y-1">
                   <TcgCard img={c.img} name={c.name} rarity={c.rarity} sizes="(max-width: 640px) 45vw, 180px" />
                 </span>

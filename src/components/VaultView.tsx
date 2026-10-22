@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { useAccount } from "wagmi";
 import { fmtUSDC } from "@/lib/odds";
+import { sfx } from "@/lib/audio";
 import { ECONOMICS, buybackFor } from "@/lib/packs";
 import { rarityRank } from "@/lib/rarity";
 import { DEMO_OWNER, canSellBack, requestShipment, sellBack, useVault, type VaultStatus } from "@/lib/vault";
@@ -52,6 +53,7 @@ export function VaultView() {
 
   const sell = () => {
     const r = sellBack(owner, [...selected]);
+    sfx.coin();
     setSelected(new Set());
     setNotice({ tone: "ok", text: `Sold ${r.count} card${r.count === 1 ? "" : "s"} for ${r.total.toFixed(2)} USDC (demo credit).` });
   };

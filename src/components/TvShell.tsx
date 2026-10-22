@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { initAudioOnGesture, setAudioPrefs, useAudioPrefs } from "@/lib/audio";
 import { Logo } from "./Logo";
 import { WalletButton } from "./WalletButton";
 
@@ -41,6 +42,9 @@ export function TvShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { clock, timer } = useClock();
   const [bw, setBw] = useState(false);
+  const audio = useAudioPrefs();
+
+  useEffect(() => initAudioOnGesture(), []);
 
   return (
     <div className="tv">
@@ -96,11 +100,27 @@ export function TvShell({ children }: { children: ReactNode }) {
               </span>
               <button
                 type="button"
-                className="link-hud cursor-pointer text-dim hover:text-phosphor"
+                className="link-hud hidden cursor-pointer text-dim hover:text-phosphor sm:inline"
                 aria-pressed={bw}
                 onClick={() => setBw((v) => !v)}
               >
                 B&amp;W [{bw ? "On" : "Off"}]
+              </button>
+              <button
+                type="button"
+                className="link-hud cursor-pointer text-dim hover:text-phosphor"
+                aria-pressed={audio.music}
+                onClick={() => setAudioPrefs({ music: !audio.music })}
+              >
+                ♪ <span className="hidden sm:inline">Music </span>[{audio.music ? "On" : "Off"}]
+              </button>
+              <button
+                type="button"
+                className="link-hud hidden cursor-pointer text-dim hover:text-phosphor sm:inline"
+                aria-pressed={audio.sfx}
+                onClick={() => setAudioPrefs({ sfx: !audio.sfx })}
+              >
+                SFX [{audio.sfx ? "On" : "Off"}]
               </button>
             </div>
             <div className="hud pointer-events-auto flex items-center gap-5 text-dim">

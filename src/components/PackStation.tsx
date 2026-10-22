@@ -7,6 +7,7 @@ import { useMounted } from "@/lib/useClient";
 import { useAccount } from "wagmi";
 import { bsc } from "wagmi/chains";
 import { buildPool, drawPack, fmtUSDC, type Card, type Pull } from "@/lib/odds";
+import { sfx } from "@/lib/audio";
 import { ECONOMICS, packSize, type PackConfig } from "@/lib/packs";
 import { DEMO_OWNER, recordPack } from "@/lib/vault";
 import { PackOpening } from "./PackOpening";
@@ -56,8 +57,10 @@ export function PackStation({ pack, cards, setName, packImage, ev }: Props) {
         recordPack(who, result, { setId: pack.setId, setName, price: guest ? 0 : pack.price });
         setPulls(result);
         setStatus("idle");
+        sfx.coin();
       } catch (e) {
         setStatus("error");
+        sfx.error();
         setError(e instanceof Error ? e.message : "Something went wrong");
       }
     }, 1100);
