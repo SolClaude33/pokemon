@@ -209,8 +209,16 @@ body {
   isolation: isolate;
 }
 
-.screen[data-bw="on"] .screen-content {
-  filter: grayscale(1) contrast(1.08);
+/* TV filter off: no scanlines, RGB mask, vignette, glare or flicker — cards at full clarity */
+.screen[data-crt="off"] .crt-overlay {
+  display: none;
+}
+
+.screen[data-crt="off"] {
+  background: var(--screen);
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 0 2px #1d1e21;
 }
 
 .screen-content {

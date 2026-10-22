@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { initAudioOnGesture, setAudioPrefs, useAudioPrefs } from "@/lib/audio";
 import { Logo } from "./Logo";
 import { WalletButton } from "./WalletButton";
@@ -29,6 +29,32 @@ function useClock() {
   };
 }
 
+// CRT filter preference (scanlines, RGB mask, vignette, glare), saved per browser.
+const CRT_KEY = "pc:crt";
+const crtListeners = new Set<() => void>();
+const readCrt = () => {
+  try {
+    return localStorage.getItem(CRT_KEY) !== "off";
+  } catch {
+    return true;
+  }
+};
+function setCrt(on: boolean) {
+  try {
+    localStorage.setItem(CRT_KEY, on ? "on" : "off");
+  } catch {}
+  crtListeners.forEach((l) => l());
+}
+const useCrt = () =>
+  useSyncExternalStore(
+    (l) => {
+      crtListeners.add(l);
+      return () => crtListeners.delete(l);
+    },
+    readCrt,
+    () => true,
+  );
+
 const NAV_LEFT = [
   { href: "/dex", label: "Dex", short: "Dex" },
   { href: "/market", label: "PokéMart", short: "Mart" },
@@ -41,14 +67,14 @@ const NAV_RIGHT = [
 export function TvShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { clock, timer } = useClock();
-  const [bw, setBw] = useState(false);
+  const crt = useCrt();
   const audio = useAudioPrefs();
 
   useEffect(() => initAudioOnGesture(), []);
 
   return (
     <div className="tv">
-      <div className="screen" data-bw={bw ? "on" : "off"}>
+      <div className="screen" data-crt={crt ? "on" : "off"}>
         <div className="screen-content">
           <main id="channel" className="absolute inset-0">
             {children}
@@ -94,17 +120,18 @@ export function TvShell({ children }: { children: ReactNode }) {
 
           {/* bottom HUD */}
           <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-[clamp(16px,3.4vw,40px)] pb-[clamp(14px,3.2vh,34px)]">
-            <div className="hud pointer-events-auto flex items-center gap-5 text-dim">
+            <div className="hud pointer-events-auto flex items-center gap-3 text-dim sm:gap-5">
               <span className="hidden tabular-nums sm:inline" suppressHydrationWarning>
                 {clock}
               </span>
               <button
                 type="button"
-                className="link-hud hidden cursor-pointer text-dim hover:text-phosphor sm:inline"
-                aria-pressed={bw}
-                onClick={() => setBw((v) => !v)}
+                className="link-hud cursor-pointer text-dim hover:text-phosphor"
+                aria-pressed={crt}
+                aria-label={crt ? "Turn the TV filter off" : "Turn the TV filter on"}
+                onClick={() => setCrt(!crt)}
               >
-                B&amp;W [{bw ? "On" : "Off"}]
+                TV<span className="hidden sm:inline"> filter</span> [{crt ? "On" : "Off"}]
               </button>
               <button
                 type="button"
@@ -123,7 +150,7 @@ export function TvShell({ children }: { children: ReactNode }) {
                 SFX [{audio.sfx ? "On" : "Off"}]
               </button>
             </div>
-            <div className="hud pointer-events-auto flex items-center gap-5 text-dim">
+            <div className="hud pointer-events-auto flex items-center gap-3 text-dim sm:gap-5">
               {[...NAV_LEFT, ...NAV_RIGHT].map((n) => (
                 <Link key={n.href} href={n.href} className="link-hud md:hidden" aria-current={pathname.startsWith(n.href) ? "page" : undefined}>
                   {n.short}
