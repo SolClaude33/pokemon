@@ -5,9 +5,9 @@ import { listDexCards, listPacks } from "@/lib/catalog";
 
 export const metadata: Metadata = { title: "Card Dex" };
 
-export default function DexPage() {
-  const cards = listDexCards();
-  const packs = listPacks().map((p) => ({ id: p.setId, name: p.set.name }));
+export default async function DexPage() {
+  const cards = await listDexCards();
+  const packs = (await listPacks()).map((p) => ({ id: p.setId, name: p.set.name }));
   const hits = cards.filter((c) => c.price != null && c.price >= 20).length;
 
   return (

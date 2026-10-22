@@ -58,10 +58,11 @@ const useCrt = () =>
 const NAV_LEFT = [
   { href: "/dex", label: "Dex", short: "Dex" },
   { href: "/market", label: "PokéMart", short: "Mart" },
+  { href: "/missions", label: "Missions", short: "Quests" },
 ];
 const NAV_RIGHT = [
   { href: "/vault", label: "Vault", short: "Vault" },
-  { href: "/how-it-works", label: "How it works", short: "Info" },
+  { href: "/profile", label: "Profile", short: "Me" },
 ];
 
 export function TvShell({ children }: { children: ReactNode }) {
@@ -156,7 +157,10 @@ export function TvShell({ children }: { children: ReactNode }) {
                   {n.short}
                 </Link>
               ))}
-              <span className="hidden items-center gap-2 sm:flex">
+              <Link href="/how-it-works" className="link-hud hidden md:inline" aria-current={pathname === "/how-it-works" ? "page" : undefined}>
+                How it works
+              </Link>
+              <span className="hidden items-center gap-2 lg:flex">
                 <span className="rec-dot" aria-hidden="true" />
                 Source: BNB Chain
               </span>

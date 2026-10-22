@@ -11,28 +11,13 @@ import {
   trustWallet,
   walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
+import type { Transport } from "viem";
 import { createConfig, http } from "wagmi";
-import { bsc } from "wagmi/chains";
+import { RPC_URL, chain } from "./chain/config";
 
 /** WalletConnect Cloud project id. Without it, only browser-extension wallets work. */
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";
 export const hasWalletConnect = projectId.length > 0;
-
-// Binance-Peg USD Coin on BNB Smart Chain (18 decimals).
-export const USDC_BSC = {
-  address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
-  decimals: 18,
-} as const;
-
-export const erc20BalanceAbi = [
-  {
-    type: "function",
-    name: "balanceOf",
-    stateMutability: "view",
-    inputs: [{ name: "account", type: "address" }],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-] as const;
 
 const recommended = [metaMaskWallet, binanceWallet, trustWallet, okxWallet];
 const others = [rabbyWallet, bitgetWallet, safepalWallet, coinbaseWallet, injectedWallet];
@@ -46,8 +31,8 @@ const connectors = connectorsForWallets(
 );
 
 export const wagmiConfig = createConfig({
-  chains: [bsc],
+  chains: [chain],
   connectors,
-  transports: { [bsc.id]: http(process.env.NEXT_PUBLIC_BSC_RPC_URL || undefined) },
+  transports: { [chain.id]: http(RPC_URL) } as Record<(typeof chain)["id"], Transport>,
   ssr: true,
 });

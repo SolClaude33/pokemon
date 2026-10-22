@@ -132,23 +132,22 @@ export function chaseCards(cards: Card[], n = 6) {
     .slice(0, n);
 }
 
-function rand() {
+function cryptoRand() {
   const u = new Uint32Array(1);
   crypto.getRandomValues(u);
   return u[0] / 2 ** 32;
 }
 
-const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)];
-
 /**
- * DEMO draw, done in the browser. In production the pull must come from the
- * vaulted inventory server-side or on-chain (e.g. VRF) so it can be audited.
+ * Draws one pack from its slot tables. The server passes the provably fair RNG
+ * (see src/server/fair.ts) so every pull can be re-computed by the user.
  */
-export function drawPack(pack: PackConfig, pool: Pool): Pull[] {
+export function drawPack(pack: PackConfig, pool: Pool, rng: () => number = cryptoRand): Pull[] {
+  const pick = <T,>(xs: T[]) => xs[Math.floor(rng() * xs.length)];
   const pulls: Pull[] = [];
   for (const s of slotTables(pack, pool)) {
     for (let i = 0; i < s.count; i++) {
-      let roll = rand();
+      let roll = rng();
       let rarity = s.fill;
       for (const [r, p] of s.table) {
         if (roll < p) {
@@ -162,7 +161,7 @@ export function drawPack(pack: PackConfig, pool: Pool): Pull[] {
       const card = pick(candidates.length ? candidates : (pool.get(rarity) ?? pool.get(s.fill) ?? []));
       if (!card) continue;
       pulls.push({
-        uid: `${card.id}-${reverse ? "rh" : "n"}-${Date.now().toString(36)}-${Math.floor(rand() * 1e6).toString(36)}`,
+        uid: crypto.randomUUID(),
         card,
         rarity: reverse ? "Reverse Holo" : card.rarity,
         reverse,
@@ -174,9 +173,9 @@ export function drawPack(pack: PackConfig, pool: Pool): Pull[] {
   return pulls;
 }
 
-/** Card and pack values in USDC (1 USDC ≈ 1 USD of TCGplayer market price). */
-export const fmtUSDC = (n: number) =>
-  `${n.toLocaleString("en-US", n >= 1000 ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`;
+/** Card and pack values in USDT (1 USDT ≈ 1 USD of TCGplayer market price). */
+export const fmtUSDT = (n: number) =>
+  `${n.toLocaleString("en-US", n >= 1000 ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`;
 
 export const fmtOneIn = (p: number) => {
   if (p <= 0) return "—";

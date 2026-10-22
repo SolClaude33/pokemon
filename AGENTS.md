@@ -10,18 +10,21 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Repository Guidelines
 
-PokéCast (folder/repo still named `holovision`): buy and rip real Pokémon TCG booster packs with USDC on BNB Chain, see the odds first, then sell cards back, trade them on the PokéMart or ship them home. UI copy is English.
+PokéCast (folder still named `holovision`; repo SolClaude33/pokemon): real-money Pokémon TCG pack opening on BNB Chain. Users pay in USDT (BEP-20), rip packs drawn provably fair on the server, keep cards in a vault, sell them back, trade them on the PokéMart, ship them home, level up for cashback and complete missions. UI copy is English.
 
 ## Structure
-- `src/app` — routes: `/` channel carousel, `/packs/[id]` odds + buy + opening, `/dex` card catalog, `/market` PokéMart, `/vault`, `/how-it-works`. `layout.tsx` wraps everything in the CRT `TvShell`.
-- `src/components` — `TvShell` (CRT frame + HUD), `PackArc` (carousel; CSS arc first paint/fallback, `three/ArcCanvas` when WebGL is ready), `PackHero` + `three/PackViewer` (draggable 3D pack), `three/Pack3D` + `packAssets` (pillow geometry, crimp alpha, generated pack back), `PackStation`/`PackOpening` (buy → tear → reveal → sell), `DexView`, `MarketView`, `CardModal`, `TcgCard`, `Logo` (CRT + Poké Ball mark, arched wordmark).
-- `src/lib` — `packs.ts` (lineup, pull rates, buyback/shipping economics — placeholders to confirm), `odds.ts` (slot model, EV, demo draw), `vault.ts` (localStorage demo vault + PokéMart listings), `wallet.ts` (wagmi/RainbowKit on BSC, USDC `0x8AC7…580d`, 18 decimals).
-- `src/data/sets/*.json` — generated card pools (rarity + TCGplayer market price).
-- Assets: served from `public/assets/{cards,packs,sets}` (`/assets/...`); originals + API cache in `assets-src/` (gitignored).
+- `contracts/` — Hardhat 2 project: `PokeCastPayments.sol` (EIP-712 signed checkouts; USDT goes payer → treasury or seller, never held), `MockUSDT` for local/testnet, tests, `scripts/deploy-local.ts`, `scripts/export-abi.mjs` (writes `src/lib/chain/artifacts.ts`).
+- `src/server/` (server-only) — `db.ts` (Neon via `DATABASE_URL`, else PGlite in `.data/`; schema created on boot), `session.ts` (SIWE + JWT cookie, admins via `ADMIN_ADDRESSES`), `chain.ts` (signs payments, reads `Paid` events, verifies USDT payouts), `fair.ts` (HMAC seeds), `prices.ts` (TCGplayer prices in Postgres, daily refresh, pack = sealed market + 5%), `store.ts` (all business logic).
+- `src/app/api/*` — thin route handlers over `store.ts`; `cron/prices` + `cron/sync` run from `vercel.json`.
+- `src/app` pages: `/` carousel, `/packs/[id]`, `/dex`, `/market`, `/missions`, `/vault`, `/profile`, `/admin`, `/how-it-works`.
+- `src/lib/` — shared config: `packs.ts` (lineup, pull rates, fees), `levels.ts`, `missions.ts`, `odds.ts`, `chain/config.ts`, `pay.ts` (client checkout: approve → pay → confirm).
+- Card data: `src/data/sets/*.json` from `scripts/build-catalog.mjs`; images in `public/assets/`.
 
 ## Commands
-- `npm run dev` (preview config "holovision" uses port 3311), `npm run build`, `npm run lint`, `npx tsc --noEmit`.
-- `node scripts/build-catalog.mjs [--skip-images]` — refreshes card data from pokemontcg.io (flaky: retries + caches pages), backfills missing prices from TCGplayer search, downloads pack art (TCGplayer CDN) and converts to webp with ffmpeg.
+- App: `npm run dev` (preview "holovision", port 3311), `npm run build`, `npm run lint`, `npx tsc --noEmit`.
+- Contracts: `cd contracts && npx hardhat test`; after changes `npx hardhat compile && node scripts/export-abi.mjs`.
+- Local chain: `cd contracts && npx hardhat node`, then `npx hardhat run scripts/deploy-local.ts --network localhost` (writes addresses to `.env.local`), restart dev, `node scripts/e2e-local.mjs` (24 end-to-end checks).
+- Catalog: `node scripts/build-catalog.mjs [--skip-images]`.
 
 ## Design tokens (keep)
 Direction: late-night CRT channel ripping Pokémon packs, seen through Game Boy-era eyes (ref. arcmarumo.com). Phosphor HUD on blue-black glass; Pokémon yellow/blue/red as brand accents; holo foil for rarity light. Avoid purple SaaS gradients, generic rounded app cards, emoji.
@@ -32,7 +35,8 @@ Direction: late-night CRT channel ripping Pokémon packs, seen through Game Boy-
 - 3D: React Three Fiber, `flat` (no tone mapping) so printed art keeps its colors; lights from drei Lightformers (no HDR downloads).
 
 ## Conventions & limits
-- Purchases, draws, the vault and the PokéMart are DEMO (client-side localStorage, no USDC moves; seeded listings are examples). Card values = TCGplayer market price shown as USDC. Production needs a contract/escrow and server-side or VRF draws against real inventory.
-- Pull rates are community estimates; card/pack art is Nintendo/TPC IP — keep sources cited on pack pages.
-- Never commit `.env*`; optional `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`, `NEXT_PUBLIC_BSC_RPC_URL`.
-- `@coinbase/cdp-sdk` is aliased to a stub in `next.config.ts` (unused Base connector dependency).
+- Money paths: prices come from `livePriceBook()` (uncached); every checkout is signed server-side and fulfilled only from on-chain `Paid` events (idempotent by checkout id). Outgoing USDT (buybacks, cashback) is a payout queue paid by an admin wallet from `/admin`; the server verifies the transfer.
+- Never put private keys in the repo; `.env.local` holds local-only test keys. `SIGNER_PRIVATE_KEY` holds no funds — rotate with `setSigner` if exposed. The contract owner deploys from `/admin` with their own wallet.
+- Pull rates are community estimates; fees, buyback rates, levels and mission rewards in `src/lib/{packs,levels,missions}.ts` are business settings.
+- Card/pack art is Nintendo/TPC IP and "Poké" branding is theirs; real-money random packs may be regulated as gambling — owner's legal call.
+- `@coinbase/cdp-sdk` is aliased to a stub in `next.config.ts` (unused Base connector dependency); PGlite is a server external.

@@ -1,11 +1,13 @@
 import { PackArc, type ArcPack } from "@/components/PackArc";
-import { getPack, listPacks } from "@/lib/catalog";
+import { getPackSync, listPacks } from "@/lib/catalog";
+import { priceBook } from "@/server/prices";
 import { buildPool, chaseCards, expectedValue } from "@/lib/odds";
 import { packSize } from "@/lib/packs";
 
-export default function Home() {
-  const packs: ArcPack[] = listPacks().map((p) => {
-    const { cards } = getPack(p.setId)!;
+export default async function Home() {
+  const book = await priceBook();
+  const packs: ArcPack[] = (await listPacks(book)).map((p) => {
+    const { cards } = (getPackSync(p.setId, book))!;
     const top = chaseCards(cards, 1)[0];
     return {
       setId: p.setId,

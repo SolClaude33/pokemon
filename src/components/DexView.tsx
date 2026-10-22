@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDeferredValue, useMemo, useState } from "react";
-import { fmtOneIn, fmtUSDC, type DexCard } from "@/lib/odds";
+import { fmtOneIn, fmtUSDT, type DexCard } from "@/lib/odds";
 import { sfx } from "@/lib/audio";
 import { RARITY_ORDER, rarityMeta, rarityRank } from "@/lib/rarity";
 import { CardModal } from "./CardModal";
@@ -192,7 +192,7 @@ export function DexView({ cards, packs }: { cards: DexCard[]; packs: { id: strin
                 <span className="mt-2 block truncate text-[13px] group-hover:text-poke-yellow">{c.name}</span>
                 <RarityTag rarity={c.rarity} className="mt-1" />
                 <span className="hud mt-1 flex justify-between gap-2 text-dim">
-                  <span className="text-phosphor">{c.price != null ? fmtUSDC(c.price) : "—"}</span>
+                  <span className="text-phosphor">{c.price != null ? fmtUSDT(c.price) : "—"}</span>
                   <span>{fmtOneIn(c.odds)}</span>
                 </span>
                 <span className="hud mt-0.5 block truncate text-faint">

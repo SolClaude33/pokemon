@@ -6,19 +6,20 @@ import { Suspense } from "react";
 import { PackHero } from "@/components/PackHero";
 import { PackStation } from "@/components/PackStation";
 import { RarityTag, TcgCard } from "@/components/TcgCard";
-import { catalogGeneratedAt, getPack, listPacks } from "@/lib/catalog";
-import { buildPool, cardOdds, chaseCards, expectedValue, fmtOneIn, fmtPct, fmtUSDC, rarityOdds } from "@/lib/odds";
-import { ECONOMICS, packSize } from "@/lib/packs";
+import index from "@/data/sets/index.json";
+import { getPack, pricesUpdatedAt } from "@/lib/catalog";
+import { buildPool, cardOdds, chaseCards, expectedValue, fmtOneIn, fmtPct, fmtUSDT, rarityOdds } from "@/lib/odds";
+import { ECONOMICS, PACKS, packSize } from "@/lib/packs";
 import { rarityMeta } from "@/lib/rarity";
 
 export function generateStaticParams() {
-  return listPacks().map((p) => ({ id: p.setId }));
+  return PACKS.map((p) => ({ id: p.setId }));
 }
 
 export async function generateMetadata({ params }: PageProps<"/packs/[id]">): Promise<Metadata> {
   const { id } = await params;
-  const pack = getPack(id);
-  return pack ? { title: `${pack.listing.set.name} — odds & pack opening` } : {};
+  const set = index.sets.find((s) => s.id === id);
+  return set ? { title: `${set.name} — odds & pack opening` } : {};
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -49,8 +50,8 @@ function PackSkeleton() {
   );
 }
 
-function PackContent({ id }: { id: string }) {
-  const data = getPack(id);
+async function PackContent({ id }: { id: string }) {
+  const data = await getPack(id);
   if (!data) notFound();
   const { listing: pack, cards } = data;
   const pool = buildPool(cards);
@@ -58,7 +59,7 @@ function PackContent({ id }: { id: string }) {
   const ev = expectedValue(pack, pool);
   const chase = chaseCards(cards, 6);
   const hitChance = 1 - odds.filter((o) => rarityMeta(o.rarity).hit && o.rarity !== "Reverse Holo" && !pack.minorRarities?.includes(o.rarity)).reduce((a, o) => a * (1 - o.perPack), 1);
-  const updated = new Date(catalogGeneratedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const updated = new Date(await pricesUpdatedAt()).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   return (
     <div className="channel-scroll">
@@ -84,7 +85,7 @@ function PackContent({ id }: { id: string }) {
                 ["Channel", pad2(pack.channel)],
                 ["Released", pack.set.releaseDate.replaceAll("/", ".")],
                 ["Cards in set", String(pack.set.cardCount)],
-                ["Sealed market", pack.set.packMarketPrice ? fmtUSDC(pack.set.packMarketPrice) : "—"],
+                ["Sealed market", pack.set.packMarketPrice ? fmtUSDT(pack.set.packMarketPrice) : "—"],
               ].map(([k, v]) => (
                 <div key={k}>
                   <dt className="text-faint">[{k}]</dt>
@@ -107,7 +108,7 @@ function PackContent({ id }: { id: string }) {
             <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed text-phosphor/85">{pack.tagline}</p>
 
             <div className="mt-8 grid max-w-2xl gap-6 sm:grid-cols-[1.25fr_1fr]">
-              <PackStation pack={pack} cards={cards} setName={pack.set.name} packImage={pack.set.packImage} ev={ev} />
+              <PackStation pack={pack} setName={pack.set.name} packImage={pack.set.packImage} ev={ev} />
               <div className="flex flex-col justify-between gap-6 border-l border-line pl-6">
                 <div>
                   <p className="hud text-faint">[Chance of a hit]</p>
@@ -118,7 +119,7 @@ function PackContent({ id }: { id: string }) {
                 </div>
                 <div>
                   <p className="hud text-faint">[Sell-back EV]</p>
-                  <p className="mt-1 font-display text-4xl">{fmtUSDC(ev * ECONOMICS.buybackRate)}</p>
+                  <p className="mt-1 font-display text-4xl">{fmtUSDT(ev * ECONOMICS.buybackRate)}</p>
                   <p className="hud mt-1 text-dim">If you sold every card back</p>
                 </div>
               </div>
@@ -174,7 +175,7 @@ function PackContent({ id }: { id: string }) {
                       </span>
                     </td>
                     <td className="hud py-3 text-dim">{fmtOneIn(o.perPack)}</td>
-                    <td className="hud py-3 text-right tabular-nums">{fmtUSDC(o.avgValue)}</td>
+                    <td className="hud py-3 text-right tabular-nums">{fmtUSDT(o.avgValue)}</td>
                     <td className="hud max-w-[22ch] truncate py-3 pl-6 text-right normal-case text-dim">
                       {o.top ? o.top.name : "—"}
                     </td>
@@ -205,7 +206,7 @@ function PackContent({ id }: { id: string }) {
                 <p className="mt-3 truncate text-[13px]">{c.name}</p>
                 <RarityTag rarity={c.rarity} className="mt-1" />
                 <p className="hud mt-1 flex justify-between text-dim">
-                  <span className="text-phosphor">{fmtUSDC(c.price ?? 0)}</span>
+                  <span className="text-phosphor">{fmtUSDT(c.price ?? 0)}</span>
                   <span>{fmtOneIn(cardOdds(c, odds))}</span>
                 </p>
               </li>
@@ -215,7 +216,7 @@ function PackContent({ id }: { id: string }) {
 
         <footer className="hud mt-20 border-t border-line pt-6 leading-relaxed text-faint">
           <p>
-            Card values: TCGplayer market price, snapshot {updated}. Pull rates are community estimates — The Pokémon Company does not
+            Card values: TCGplayer market price in USDT, updated {updated}. Pack price: sealed TCGplayer market + 5%. Pull rates are community estimates — The Pokémon Company does not
             publish official odds. Sources:{" "}
             {pack.sources.map((s, i) => (
               <span key={s.url}>

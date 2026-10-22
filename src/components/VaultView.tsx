@@ -1,274 +1,354 @@
 "use client";
 
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
-import { useAccount } from "wagmi";
-import { fmtUSDC } from "@/lib/odds";
 import { sfx } from "@/lib/audio";
+import { explorerTx } from "@/lib/chain/config";
+import { fmtUSDT } from "@/lib/odds";
 import { ECONOMICS, buybackFor } from "@/lib/packs";
+import { STEP_LABEL, usePayment, type SignedPayment } from "@/lib/pay";
 import { rarityRank } from "@/lib/rarity";
-import { DEMO_OWNER, canSellBack, requestShipment, sellBack, useVault, type VaultStatus } from "@/lib/vault";
+import { api, useMe } from "@/lib/session";
+import type { ApiItem, VaultData } from "@/lib/types";
 import { RarityTag, TcgCard } from "./TcgCard";
-import { WalletButton, shortAddr } from "./WalletButton";
+import { shortAddr } from "./WalletButton";
 
-const TABS: { id: VaultStatus; label: string }[] = [
-  { id: "vault", label: "In vault" },
-  { id: "listed", label: "On PokéMart" },
-  { id: "shipping", label: "Shipping" },
-  { id: "sold", label: "Sold back" },
+type Tab = "vault" | "listed" | "pending" | "shipping" | "sold";
+
+const TABS: { id: Tab; label: string; statuses: ApiItem["status"][] }[] = [
+  { id: "vault", label: "In vault", statuses: ["vault"] },
+  { id: "listed", label: "On PokéMart", statuses: ["listed"] },
+  { id: "pending", label: "Buyback pending", statuses: ["buyback_pending"] },
+  { id: "shipping", label: "Shipping", statuses: ["shipping", "shipped"] },
+  { id: "sold", label: "Sold", statuses: ["sold"] },
 ];
+
+const STATUS_LABEL: Record<ApiItem["status"], string> = {
+  vault: "",
+  listed: "Listed",
+  buyback_pending: "Payout pending",
+  sold: "Sold",
+  shipping: "Packing",
+  shipped: "Shipped",
+};
 
 type Notice = { tone: "ok" | "error"; text: string } | null;
 
-export function VaultView() {
-  const { address } = useAccount();
-  const owner = address ?? DEMO_OWNER;
-  const state = useVault(owner);
-  const [tab, setTab] = useState<VaultStatus>("vault");
+const canBuyBack = (it: ApiItem) =>
+  it.status === "vault" && Date.now() - new Date(it.acquired_at).getTime() < ECONOMICS.buybackWindowHours * 3_600_000;
+
+export function VaultView({ setNames }: { setNames: Record<string, string> }) {
+  const me = useMe();
+  const { openConnectModal } = useConnectModal();
+  const qc = useQueryClient();
+  const pay = usePayment();
+  const address = me.data?.address ?? null;
+  const vault = useQuery<VaultData>({ queryKey: ["vault"], queryFn: () => api("/api/vault"), enabled: !!address });
+  const [tab, setTab] = useState<Tab>("vault");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [shipOpen, setShipOpen] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const [busy, setBusy] = useState(false);
 
+  const all = useMemo(() => vault.data?.items ?? [], [vault.data]);
+  const statuses = TABS.find((t) => t.id === tab)!.statuses;
   const items = useMemo(
     () =>
-      state.items
-        .filter((i) => i.status === tab)
-        .sort((a, b) => b.value - a.value || rarityRank(b.rarity) - rarityRank(a.rarity)),
-    [state.items, tab],
+      all
+        .filter((i) => statuses.includes(i.status))
+        .sort((a, b) => Number(b.value_at_pull) - Number(a.value_at_pull) || rarityRank(b.rarity) - rarityRank(a.rarity)),
+    [all, statuses],
   );
-  const inVault = state.items.filter((i) => i.status === "vault");
-  const vaultValue = inVault.reduce((a, i) => a + i.value, 0);
-  const credited = state.ledger.filter((l) => l.type === "sellback").reduce((a, l) => a + l.amount, 0);
-  const spent = -state.ledger.filter((l) => l.type !== "sellback").reduce((a, l) => a + l.amount, 0);
-  const chosen = inVault.filter((i) => selected.has(i.uid));
-  const chosenBuyback = chosen.filter((i) => canSellBack(i)).reduce((a, i) => a + buybackFor(i.value), 0);
+  const inVault = all.filter((i) => i.status === "vault");
+  const vaultValue = inVault.reduce((a, i) => a + Number(i.value_at_pull), 0);
+  const chosen = inVault.filter((i) => selected.has(i.id));
+  const chosenBuyback = chosen.filter(canBuyBack).reduce((a, i) => a + buybackFor(Number(i.value_at_pull)), 0);
 
-  const toggle = (uid: string) =>
+  if (!me.isLoading && !address) {
+    return (
+      <div className="mx-auto mt-14 flex max-w-md flex-col items-center gap-5">
+        <p className="gb-dialog w-full">Sign in with your wallet to open your vault.</p>
+        <button type="button" className="btn btn-primary" onClick={() => openConnectModal?.()}>
+          Connect wallet
+        </button>
+      </div>
+    );
+  }
+
+  const toggle = (id: string) =>
     setSelected((s) => {
       const n = new Set(s);
-      if (n.has(uid)) n.delete(uid);
-      else n.add(uid);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
       return n;
     });
 
-  const sell = () => {
-    const r = sellBack(owner, [...selected]);
-    sfx.coin();
-    setSelected(new Set());
-    setNotice({ tone: "ok", text: `Sold ${r.count} card${r.count === 1 ? "" : "s"} for ${r.total.toFixed(2)} USDC (demo credit).` });
+  const buyback = async () => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const r = await api<{ total: number; count: number }>("/api/vault/buyback", { itemIds: [...selected] });
+      sfx.coin();
+      setSelected(new Set());
+      setNotice({ tone: "ok", text: `Buyback requested: ${r.total.toFixed(2)} USDT for ${r.count} card${r.count === 1 ? "" : "s"}. It's paid to your wallet once processed.` });
+      qc.invalidateQueries();
+    } catch (e) {
+      sfx.error();
+      setNotice({ tone: "error", text: e instanceof Error ? e.message : "Buyback failed" });
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const ship = (e: FormEvent<HTMLFormElement>) => {
+  const ship = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    const get = (k: string) => String(f.get(k) ?? "").trim();
-    if (!get("name") || !get("street") || !get("city") || !get("postal") || !get("country")) {
+    const to = Object.fromEntries(["name", "line1", "city", "postal", "country"].map((k) => [k, String(f.get(k) ?? "").trim()]));
+    if (Object.values(to).some((v) => !v)) {
       setNotice({ tone: "error", text: "Fill in every address field to ship." });
       return;
     }
-    const s = requestShipment(owner, [...selected], { name: get("name"), city: get("city"), country: get("country") });
-    setSelected(new Set());
-    setShipOpen(false);
-    setTab("shipping");
-    setNotice({ tone: "ok", text: `Shipment ${s.id} requested · ${s.items.length} card${s.items.length === 1 ? "" : "s"} · ${s.fee} USDC fee (demo).` });
+    setNotice(null);
+    try {
+      await pay.run(() => api<SignedPayment>("/api/vault/ship", { itemIds: [...selected], to }));
+      sfx.coin();
+      setSelected(new Set());
+      setShipOpen(false);
+      setTab("shipping");
+      setNotice({ tone: "ok", text: "Shipping paid — we'll pack your cards and post the tracking number here." });
+      qc.invalidateQueries();
+    } catch {
+      sfx.error();
+    }
   };
 
+  const payouts = vault.data?.payouts ?? [];
+  const shipments = vault.data?.shipments ?? [];
+  const vouchers = vault.data?.vouchers ?? [];
+
   return (
-    <div className="channel-scroll">
-      <div className="mx-auto max-w-6xl px-[clamp(16px,3.4vw,40px)] pt-[clamp(96px,15vh,140px)] pb-[clamp(80px,12vh,120px)]">
-        <div className="flex flex-wrap items-end justify-between gap-6 border-b border-line-strong pb-6">
-          <div>
-            <p className="pixel text-[10px] text-dim">{address ? `Wallet ${shortAddr(address)}` : "Demo vault · no wallet"}</p>
-            <h1 className="poke-title mt-3 text-[clamp(2.4rem,5vw,4rem)] leading-none">Your vault</h1>
-          </div>
-          <dl className="hud grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
-            {[
-              ["Cards held", String(inVault.length)],
-              ["Market value", fmtUSDC(vaultValue)],
-              ["Sold back", `${credited.toFixed(2)} USDC`],
-              ["Spent", `${spent.toFixed(2)} USDC`],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <dt className="text-faint">[{k}]</dt>
-                <dd className="mt-1 text-phosphor">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-
-        {!address && (
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border border-line p-4">
-            <p className="hud text-dim">You&apos;re viewing the demo vault for free rips. Connect a wallet on BNB Chain to see yours.</p>
-            <div className="w-56">
-              <WalletButton size="large" />
+    <>
+      <div className="mt-6 flex flex-wrap items-end justify-between gap-6 border-b border-line-strong pb-6">
+        <p className="pixel text-dim">{address ? `Wallet ${shortAddr(address)}` : "…"}</p>
+        <dl className="hud grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3">
+          {[
+            ["Cards held", String(inVault.length)],
+            ["Vault value", fmtUSDT(vaultValue)],
+            ["Free packs", String(vouchers.length)],
+          ].map(([k, v]) => (
+            <div key={k}>
+              <dt className="text-faint">[{k}]</dt>
+              <dd className="mt-1 text-phosphor">{v}</dd>
             </div>
-          </div>
-        )}
+          ))}
+        </dl>
+      </div>
 
-        {notice && (
-          <p role={notice.tone === "error" ? "alert" : "status"} className={`hud mt-6 ${notice.tone === "error" ? "text-signal" : "text-ok"}`}>
-            {notice.text}
+      {vouchers.length > 0 && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border border-ok/40 p-4">
+          <p className="hud text-ok">
+            You have {vouchers.length} free pack{vouchers.length > 1 ? "s" : ""} from missions:{" "}
+            {vouchers.map((v) => setNames[v.set_id] ?? v.set_id).join(", ")}
           </p>
-        )}
+          <div className="flex flex-wrap gap-2">
+            {[...new Set(vouchers.map((v) => v.set_id))].map((s) => (
+              <Link key={s} href={`/packs/${s}`} className="btn btn-primary">
+                Open {setNames[s] ?? s}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
-        <div role="tablist" aria-label="Vault sections" className="hud mt-8 flex gap-6">
-          {TABS.map((t) => {
-            const count = state.items.filter((i) => i.status === t.id).length;
+      {notice && (
+        <p role={notice.tone === "error" ? "alert" : "status"} className={`hud mt-6 ${notice.tone === "error" ? "text-poke-red" : "text-ok"}`}>
+          {notice.text}
+        </p>
+      )}
+
+      <div role="tablist" aria-label="Vault sections" className="hud mt-8 flex flex-wrap gap-x-6 gap-y-2">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            type="button"
+            aria-selected={tab === t.id}
+            onClick={() => {
+              setTab(t.id);
+              setSelected(new Set());
+            }}
+            className={`cursor-pointer border-b-2 pb-2 uppercase transition-colors ${tab === t.id ? "border-poke-yellow text-poke-yellow" : "border-transparent text-dim hover:text-phosphor"}`}
+          >
+            {t.label} ({all.filter((i) => t.statuses.includes(i.status)).length})
+          </button>
+        ))}
+      </div>
+
+      {vault.isLoading ? (
+        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          {Array.from({ length: 5 }, (_, i) => (
+            <div key={i} className="skeleton aspect-[734/1024]" />
+          ))}
+        </div>
+      ) : vault.isError ? (
+        <p className="gb-dialog mx-auto mt-12 max-w-md">Couldn&apos;t load your vault. Refresh to try again.</p>
+      ) : items.length === 0 ? (
+        <div className="mx-auto mt-14 flex max-w-md flex-col items-center gap-5">
+          <p className="gb-dialog w-full">
+            {tab === "vault" ? "No signal. Your vault is empty." : tab === "listed" ? "Nothing listed on the PokéMart." : "Nothing here yet."}
+          </p>
+          {tab === "vault" && (
+            <Link href="/" className="btn btn-primary">
+              Tune in to a pack
+            </Link>
+          )}
+        </div>
+      ) : (
+        <ul className="mt-8 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
+          {items.map((it) => {
+            const on = selected.has(it.id);
+            const value = Number(it.value_at_pull);
+            const body = (
+              <>
+                <span className={`block transition-[opacity,transform] duration-300 ${on ? "scale-[0.96] opacity-60" : ""}`}>
+                  <TcgCard img={it.img} name={it.name} rarity={it.rarity} reverse={it.reverse} sizes="(max-width: 640px) 45vw, 200px" />
+                </span>
+                <span className="mt-2 block truncate text-[13px]">{it.name}</span>
+                <RarityTag rarity={it.rarity} className="mt-1" />
+                <span className="hud mt-1 flex justify-between gap-2 text-dim">
+                  <span>{fmtUSDT(value)}</span>
+                  {it.status === "vault" ? (
+                    <span className={on ? "text-ok" : ""}>{on ? "■ Selected" : "□ Select"}</span>
+                  ) : (
+                    <span className="text-poke-yellow">{STATUS_LABEL[it.status]}</span>
+                  )}
+                </span>
+                <span className="hud mt-0.5 block truncate text-faint">
+                  {setNames[it.set_id] ?? it.set_id}
+                  {it.source === "market" && " · bought"}
+                  {it.status === "vault" && !canBuyBack(it) && " · ship or list"}
+                </span>
+              </>
+            );
             return (
-              <button
-                key={t.id}
-                role="tab"
-                type="button"
-                aria-selected={tab === t.id}
-                onClick={() => {
-                  setTab(t.id);
-                  setSelected(new Set());
-                }}
-                className={`cursor-pointer border-b pb-2 uppercase transition-colors ${tab === t.id ? "border-phosphor text-phosphor" : "border-transparent text-dim hover:text-phosphor"}`}
-              >
-                {t.label} ({count})
-              </button>
+              <li key={it.id}>
+                {it.status === "vault" ? (
+                  <label className="block cursor-pointer">
+                    <input type="checkbox" className="peer sr-only" checked={on} onChange={() => toggle(it.id)} />
+                    <span className="block peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-dashed">
+                      {body}
+                    </span>
+                  </label>
+                ) : (
+                  body
+                )}
+              </li>
             );
           })}
-        </div>
+        </ul>
+      )}
 
-        {items.length === 0 ? (
-          <div className="mx-auto mt-14 flex max-w-md flex-col items-center gap-5">
-            <p className="gb-dialog w-full">
-              {tab === "vault"
-                ? "No signal. Your vault is empty."
-                : tab === "listed"
-                  ? "Nothing listed on the PokéMart."
-                  : tab === "shipping"
-                    ? "Nothing on the way yet."
-                    : "No cards sold yet."}
+      {tab === "vault" && inVault.length > 0 && (
+        <div className="sticky bottom-0 z-10 -mx-[clamp(16px,3.4vw,40px)] mt-10 border-t border-line bg-[#0b0d11]/95 px-[clamp(16px,3.4vw,40px)] pt-4 pb-[clamp(16px,4vh,36px)] backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="hud text-dim">
+              {chosen.length
+                ? `${chosen.length} selected · buyback ${chosenBuyback.toFixed(2)} USDT · or ship for ${ECONOMICS.shippingFee} USDT`
+                : "Select cards to sell back instantly, ship home or list on the PokéMart."}
             </p>
-            {tab === "vault" && (
-              <Link href="/" className="btn btn-primary">
-                Tune in to a pack
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn btn-ghost hud" onClick={() => setSelected(new Set(inVault.map((i) => i.id)))}>
+                Select all
+              </button>
+              <Link href="/market?tab=sell" className="btn">
+                List on PokéMart
               </Link>
-            )}
-          </div>
-        ) : (
-          <ul className="mt-8 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
-            {items.map((it) => {
-              const on = selected.has(it.uid);
-              const card = (
-                <>
-                  <span className={`block transition-[opacity,transform] duration-300 ${on ? "scale-[0.96] opacity-60" : ""}`}>
-                    <TcgCard img={it.img} name={it.name} rarity={it.rarity} reverse={it.reverse} sizes="(max-width: 640px) 45vw, 200px" />
-                  </span>
-                  <span className="mt-2 block truncate text-[13px]">{it.name}</span>
-                  <RarityTag rarity={it.rarity} className="mt-1" />
-                  <span className="hud mt-1 flex justify-between text-dim">
-                    <span>{fmtUSDC(it.value)}</span>
-                    {it.status === "vault" && <span className={on ? "text-ok" : ""}>{on ? "■ Selected" : "□ Select"}</span>}
-                    {it.status === "sold" && <span>Sold {fmtUSDC(it.soldFor ?? 0)}</span>}
-                    {it.status === "shipping" && <span>{it.shipmentId}</span>}
-                    {it.status === "listed" && <span className="text-poke-yellow">Listed</span>}
-                  </span>
-                  <span className="hud mt-0.5 block text-faint">
-                    {it.setName}
-                    {it.status === "vault" && !canSellBack(it) && " · ship only"}
-                  </span>
-                </>
-              );
-              return (
-                <li key={it.uid}>
-                  {it.status === "vault" ? (
-                    <label className="block cursor-pointer">
-                      <input type="checkbox" className="peer sr-only" checked={on} onChange={() => toggle(it.uid)} />
-                      <span className="block peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-dashed">
-                        {card}
-                      </span>
-                    </label>
-                  ) : (
-                    card
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        {tab === "vault" && inVault.length > 0 && (
-          <div className="sticky bottom-0 z-10 -mx-[clamp(16px,3.4vw,40px)] mt-10 border-t border-line bg-[#0b0d11]/95 px-[clamp(16px,3.4vw,40px)] pt-4 pb-[clamp(16px,4vh,36px)] backdrop-blur">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="hud text-dim">
-                {chosen.length
-                  ? `${chosen.length} selected · buyback ${chosenBuyback.toFixed(2)} USDC · or ship for ${ECONOMICS.shippingFee} USDC`
-                  : "Select cards to sell back instantly or ship home."}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn btn-ghost hud" onClick={() => setSelected(new Set(inVault.map((i) => i.uid)))}>
-                  Select all
-                </button>
-                <Link href="/market" className="btn">
-                  List on PokéMart
-                </Link>
-                <button type="button" className="btn" disabled={!chosen.length} onClick={() => setShipOpen(true)}>
-                  Ship home
-                </button>
-                <button type="button" className="btn btn-primary" disabled={!chosenBuyback} onClick={sell}>
-                  Sell back {chosenBuyback ? `${chosenBuyback.toFixed(2)} USDC` : ""}
-                </button>
-              </div>
+              <button type="button" className="btn" disabled={!chosen.length} onClick={() => setShipOpen(true)}>
+                Ship home
+              </button>
+              <button type="button" className="btn btn-primary" disabled={!chosenBuyback || busy} onClick={buyback}>
+                {busy ? "Requesting…" : `Sell back ${chosenBuyback ? `${chosenBuyback.toFixed(2)} USDT` : ""}`}
+              </button>
             </div>
-
-            {shipOpen && (
-              <form onSubmit={ship} className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-5" aria-label="Shipping address">
-                {[
-                  ["name", "Full name", "name"],
-                  ["street", "Street address", "street-address"],
-                  ["city", "City", "address-level2"],
-                  ["postal", "Postal code", "postal-code"],
-                  ["country", "Country", "country-name"],
-                ].map(([n, label, ac]) => (
-                  <label key={n} className="hud flex flex-col gap-1 text-dim">
-                    {label}
-                    <input
-                      name={n}
-                      autoComplete={ac}
-                      required
-                      className="h-11 border border-line-strong bg-transparent px-3 font-mono text-sm normal-case tracking-normal text-phosphor outline-none focus:border-phosphor"
-                    />
-                  </label>
-                ))}
-                <div className="flex gap-2 sm:col-span-2 lg:col-span-5">
-                  <button type="submit" className="btn btn-primary">
-                    Request shipment · {ECONOMICS.shippingFee} USDC
-                  </button>
-                  <button type="button" className="btn btn-ghost hud" onClick={() => setShipOpen(false)}>
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
           </div>
-        )}
 
-        {state.ledger.length > 0 && (
-          <section aria-labelledby="ledger" className="mt-20">
-            <h2 id="ledger" className="font-display text-2xl">
-              Ledger
+          {shipOpen && (
+            <form onSubmit={ship} className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-5" aria-label="Shipping address">
+              {[
+                ["name", "Full name", "name"],
+                ["line1", "Street address", "street-address"],
+                ["city", "City", "address-level2"],
+                ["postal", "Postal code", "postal-code"],
+                ["country", "Country", "country-name"],
+              ].map(([n, label, ac]) => (
+                <label key={n} className="hud flex flex-col gap-1 text-dim">
+                  {label}
+                  <input
+                    name={n}
+                    autoComplete={ac}
+                    required
+                    className="h-11 border border-line-strong bg-transparent px-3 font-mono text-sm tracking-normal text-phosphor normal-case outline-none focus:border-poke-yellow"
+                  />
+                </label>
+              ))}
+              <div className="flex flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-5">
+                <button type="submit" className="btn btn-primary" disabled={pay.busy}>
+                  {pay.busy ? STEP_LABEL[pay.step] : `Pay shipping · ${ECONOMICS.shippingFee} USDT`}
+                </button>
+                <button type="button" className="btn btn-ghost hud" onClick={() => setShipOpen(false)}>
+                  Cancel
+                </button>
+                {pay.error && <span className="hud text-poke-red">{pay.error}</span>}
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {(payouts.length > 0 || shipments.length > 0) && (
+        <section aria-labelledby="activity" className="mt-20 grid gap-10 lg:grid-cols-2">
+          <div>
+            <h2 id="activity" className="font-display text-2xl">
+              Payouts
             </h2>
             <ol className="mt-4 border-t border-line">
-              {state.ledger.slice(0, 20).map((l) => (
-                <li key={l.id} className="hud flex justify-between gap-4 border-b border-line py-3">
-                  <span className="text-dim">
-                    {new Date(l.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+              {payouts.length === 0 && <li className="hud py-3 text-faint">No payouts yet.</li>}
+              {payouts.map((p) => (
+                <li key={p.id} className="hud flex items-center justify-between gap-4 border-b border-line py-3">
+                  <span className="text-dim">{p.kind === "buyback" ? "Buyback" : "Cashback"}</span>
+                  <span>{Number(p.amount).toFixed(2)} USDT</span>
+                  {p.status === "paid" && p.tx_hash ? (
+                    <a className="link-hud text-ok" href={explorerTx(p.tx_hash)} target="_blank" rel="noreferrer">
+                      Paid ↗
+                    </a>
+                  ) : (
+                    <span className={p.status === "rejected" ? "text-poke-red" : "text-warn"}>{p.status}</span>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div>
+            <h2 className="font-display text-2xl">Shipments</h2>
+            <ol className="mt-4 border-t border-line">
+              {shipments.length === 0 && <li className="hud py-3 text-faint">No shipments yet.</li>}
+              {shipments.map((s) => (
+                <li key={s.id} className="hud flex items-center justify-between gap-4 border-b border-line py-3">
+                  <span className="text-dim">{s.id}</span>
+                  <span>
+                    {s.item_ids.length} card{s.item_ids.length === 1 ? "" : "s"} → {s.city}, {s.country}
                   </span>
-                  <span className="flex-1 truncate normal-case">{l.label}</span>
-                  <span className={l.amount >= 0 ? "text-ok" : "text-dim"}>
-                    {l.amount >= 0 ? "+" : "−"}
-                    {Math.abs(l.amount).toFixed(2)} USDC
+                  <span className={s.status === "shipped" ? "text-ok" : "text-warn"}>
+                    {s.status === "shipped" ? `Shipped · ${s.tracking}` : s.status.replace("_", " ")}
                   </span>
                 </li>
               ))}
             </ol>
-          </section>
-        )}
-      </div>
-    </div>
+          </div>
+        </section>
+      )}
+    </>
   );
 }

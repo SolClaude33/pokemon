@@ -3,7 +3,7 @@
 // community estimates (The Pokémon Company does not publish pull rates).
 
 export const ECONOMICS = {
-  currency: "USDC",
+  currency: "USDT",
   /** share of TCGplayer market value paid when a card is sold back */
   buybackRate: 0.85,
   /** better rate for cards at or above highValueThreshold */

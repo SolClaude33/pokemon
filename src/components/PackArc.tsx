@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fmtUSDC } from "@/lib/odds";
+import { fmtUSDT } from "@/lib/odds";
 import { sfx } from "@/lib/audio";
 import { useMounted, useReducedMotion, useWebGL } from "@/lib/useClient";
 import { LoadingScreen } from "./LoadingScreen";
@@ -153,7 +153,7 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
               }}
             >
               {isActive ? (
-                <Link href={`/packs/${p.setId}`} aria-label={`Open ${p.name} — ${p.price} USDC`} className="block">
+                <Link href={`/packs/${p.setId}`} aria-label={`Open ${p.name} — ${p.price} USDT`} className="block">
                   <PackArt src={p.packImage} alt={`${p.name} booster pack`} priority />
                 </Link>
               ) : (
@@ -190,15 +190,15 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
           <p className="hud mt-3 max-w-[38ch] text-phosphor/85">{current.tagline}</p>
           <p className="hud mt-2 flex flex-wrap justify-center gap-x-3 text-dim">
             <span>
-              Pack <span className="text-phosphor">{current.price.toFixed(2)} USDC</span>
+              Pack <span className="text-phosphor">{current.price.toFixed(2)} USDT</span>
             </span>
             <span aria-hidden="true">•</span>
-            <span>EV {fmtUSDC(current.ev)}</span>
+            <span>EV {fmtUSDT(current.ev)}</span>
             {current.topHit && (
               <>
                 <span aria-hidden="true" className="hidden sm:inline">•</span>
                 <span className="hidden sm:inline">
-                  Top hit {current.topHit.name} {fmtUSDC(current.topHit.price)}
+                  Top hit {current.topHit.name} {fmtUSDT(current.topHit.price)}
                 </span>
               </>
             )}
@@ -221,7 +221,7 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
       </div>
 
       <p className="sr-only" aria-live="polite">
-        {current.name}, {current.price} USDC per pack. {active + 1} of {n}.
+        {current.name}, {current.price} USDT per pack. {active + 1} of {n}.
       </p>
     </section>
   );

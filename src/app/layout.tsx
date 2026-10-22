@@ -25,7 +25,7 @@ const pressStart = Press_Start_2P({
 export const metadata: Metadata = {
   title: { default: "PokéCast — Rip real Pokémon TCG packs", template: "%s · PokéCast" },
   description:
-    "Buy and open real, sealed Pokémon TCG booster packs with USDC on BNB Chain. See the odds before you rip, then ship your cards home, sell them back instantly or trade them on the PokéMart.",
+    "Buy and open real, sealed Pokémon TCG booster packs with USDT on BNB Chain. See the odds before you rip, then ship your cards home, sell them back instantly or trade them on the PokéMart.",
 };
 
 export const viewport: Viewport = {

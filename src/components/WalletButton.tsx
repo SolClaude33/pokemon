@@ -1,29 +1,28 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { formatUnits } from "viem";
+import { erc20Abi, formatUnits } from "viem";
 import { useAccount, useReadContract } from "wagmi";
-import { bsc } from "wagmi/chains";
-import { USDC_BSC, erc20BalanceAbi } from "@/lib/wallet";
+import { USDT_ADDRESS, USDT_DECIMALS, chain } from "@/lib/chain/config";
 
-export function useUsdcBalance() {
+export function useUsdtBalance() {
   const { address } = useAccount();
   const q = useReadContract({
-    address: USDC_BSC.address,
-    abi: erc20BalanceAbi,
+    address: USDT_ADDRESS,
+    abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    chainId: bsc.id,
-    query: { enabled: !!address, refetchInterval: 30_000 },
+    chainId: chain.id,
+    query: { enabled: !!address && !!USDT_ADDRESS, refetchInterval: 20_000 },
   });
-  const value = q.data != null ? Number(formatUnits(q.data, USDC_BSC.decimals)) : null;
-  return { value, isLoading: q.isLoading, isError: q.isError };
+  const value = q.data != null ? Number(formatUnits(q.data, USDT_DECIMALS)) : null;
+  return { value, isLoading: q.isLoading, isError: q.isError, refetch: q.refetch };
 }
 
 export const shortAddr = (a?: string) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "");
 
 export function WalletButton({ size = "hud" }: { size?: "hud" | "large" }) {
-  const usdc = useUsdcBalance();
+  const usdt = useUsdtBalance();
   return (
     <ConnectButton.Custom>
       {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted, authenticationStatus }) => {
@@ -68,7 +67,7 @@ export function WalletButton({ size = "hud" }: { size?: "hud" | "large" }) {
             <span className="hidden text-dim sm:inline">{shortAddr(account.address)}</span>
             <span className="mx-2 hidden text-faint sm:inline">·</span>
             <span>
-              {usdc.isLoading ? "…" : usdc.value != null ? usdc.value.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—"} USDC
+              {usdt.isLoading ? "…" : usdt.value != null ? usdt.value.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—"} USDT
             </span>
           </button>
         );

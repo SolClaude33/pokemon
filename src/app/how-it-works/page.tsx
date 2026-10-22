@@ -1,60 +1,71 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LEVELS } from "@/lib/levels";
 import { ECONOMICS } from "@/lib/packs";
 
 export const metadata: Metadata = { title: "How it works" };
+
+const pct = (n: number) => `${+(n * 100).toFixed(1)}%`;
 
 const STEPS = [
   {
     n: "01",
     title: "Pick a channel",
-    body: "Every channel is one real, sealed English booster pack from a current Pokémon TCG set. Flip through them with ← →.",
+    body: "Every channel is one real, sealed English booster pack — from the 1999 Base Set to current Pokémon TCG sets. Flip through them with ← →.",
   },
   {
     n: "02",
     title: "Read the odds first",
-    body: "Each pack page shows the chance of every rarity per pack, the chase cards and the pack's expected value at TCGplayer market prices — before you pay a cent. The Card Dex lists every card you can pull, with its odds.",
+    body: "Each pack page shows the chance of every rarity per pack, the chase cards and the pack's expected value at TCGplayer market prices — before you pay. The Card Dex lists every card you can pull, with its odds.",
   },
   {
     n: "03",
-    title: "Pay in USDC on BNB Chain",
-    body: "Connect MetaMask, Binance Wallet, Trust, OKX or any BNB Chain wallet and pay the listed price in USDC.",
+    title: "Pay in USDT on BNB Chain",
+    body: "Sign in with MetaMask, Binance Wallet, Trust, OKX or any BNB Chain wallet and pay in USDT (BEP-20). Payments go through the PokéCast contract straight to the treasury — it never holds your funds.",
   },
   {
     n: "04",
-    title: "Rip it on air",
-    body: "Tear the seal and flip every card one by one: 10 in modern packs (4 Common, 3 Uncommon, 2 reverse holos — one can upgrade to a hit — and a Rare or better), 11 in the vintage 1999 Base Set.",
+    title: "Rip it, provably fair",
+    body: "Your cards are drawn from a server seed committed by its hash before you buy, your own client seed and a nonce. Rotate the seed in your profile to reveal it and re-check any pack.",
   },
   {
     n: "05",
-    title: "Trade on the PokéMart",
-    body: `List any card from your vault at your own price, or buy the exact card you're chasing from other collectors. Sellers pay a ${ECONOMICS.marketFee * 100}% fee; the card changes vaults instantly.`,
+    title: "Level up and earn cashback",
+    body: `Every USDT you spend on packs levels up your trainer card — from Rookie to Champion — and unlocks up to ${pct(LEVELS[LEVELS.length - 1].cashback)} cashback on every pack, withdrawable in USDT.`,
   },
   {
     n: "06",
+    title: "Complete missions",
+    body: "Daily, weekly and monthly missions reward free packs and cashback for ripping, chasing hits and trading.",
+  },
+  {
+    n: "07",
+    title: "Trade on the PokéMart",
+    body: `List any card from your vault at your own price, or buy the exact card you're chasing from other trainers. Buyers pay sellers directly on BNB Chain; sellers pay a ${pct(ECONOMICS.marketFee)} fee.`,
+  },
+  {
+    n: "08",
     title: "Ship it or sell it back",
-    body: `Keep cards in your vault and ship them home for a flat ${ECONOMICS.shippingFee} USDC per shipment, or sell any card back instantly for ${Math.round(
-      ECONOMICS.buybackRate * 100,
-    )}% of market (${Math.round(ECONOMICS.highValueRate * 100)}% on cards worth $${ECONOMICS.highValueThreshold}+).`,
+    body: `Ship cards home for a flat ${ECONOMICS.shippingFee} USDT per shipment, or sell them back for ${pct(ECONOMICS.buybackRate)} of market (${pct(ECONOMICS.highValueRate)} on cards worth ${ECONOMICS.highValueThreshold}+ USDT) within ${ECONOMICS.buybackWindowHours} hours of pulling them.`,
   },
 ];
 
 const FAQ = [
   {
     q: "Where do the odds come from?",
-    a: "The Pokémon Company does not publish pull rates. We use large community and TCGplayer pack-opening samples and cite the sources on every pack page.",
+    a: "The Pokémon Company does not publish pull rates. We use large TCGplayer and community pack-opening samples and cite the sources on every pack page.",
   },
   {
-    q: "How is a card's value set?",
-    a: "By its TCGplayer market price at the time of the last catalog snapshot, shown next to every card. Reverse holos use their reverse-holo price.",
+    q: "How are prices set?",
+    a: "Card values are TCGplayer market prices, refreshed every day and shown in USDT. A pack costs its sealed TCGplayer market price plus 5%.",
   },
   {
-    q: `How long can I sell a card back?`,
-    a: `Buyback is available for ${ECONOMICS.buybackWindowHours} hours after the pull. After that, the card stays in your vault until you ship it.`,
+    q: "When do I receive buybacks and cashback?",
+    a: "They're queued as payouts and sent in USDT to the wallet you signed in with once the PokéCast team processes them. Track every payout, with its transaction, in your vault.",
   },
   {
-    q: "Is this live?",
-    a: "Not yet. This build runs in demo mode: purchases, draws and buybacks are simulated in your browser and no USDC leaves your wallet.",
+    q: "What do I need to buy?",
+    a: "A BNB Chain wallet holding USDT (BEP-20) for the packs and a little BNB for gas. The first purchase asks you to approve USDT for the PokéCast contract.",
   },
 ];
 

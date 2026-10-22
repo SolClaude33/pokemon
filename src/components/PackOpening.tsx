@@ -3,27 +3,30 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fmtUSDC, type Pull } from "@/lib/odds";
+import { fmtUSDT, type Pull } from "@/lib/odds";
 import { duckMusic, sfx } from "@/lib/audio";
 import { buybackFor } from "@/lib/packs";
 import { rarityMeta } from "@/lib/rarity";
-import { sellBack } from "@/lib/vault";
 import { CardBack, RarityTag, TcgCard } from "./TcgCard";
 
 type Phase = "sealed" | "tearing" | "reveal" | "summary" | "done";
 
 type Props = {
-  owner: string;
-  /** free rip without a wallet */
-  demo?: boolean;
+  /** opened from a mission reward instead of a paid checkout */
+  free?: boolean;
   /** rarities not celebrated as hits in this pack */
   minor?: string[];
   pulls: Pull[];
   packImage: string;
   setName: string;
   price: number;
+  /** provably fair inputs of this pack */
+  proof?: { serverSeedHash: string; clientSeed: string; nonce: number };
+  /** requests an instant buyback; resolves with the USDT amount queued for payout */
+  onSell: (uids: string[]) => Promise<{ total: number; count: number }>;
   onClose: () => void;
-  onAgain: () => void;
+  /** next action after the rip: open the next pack of this order, or buy again */
+  next: { label: string; run: () => void };
 };
 
 const isHit = (p: Pull, minor: string[] = []) => !p.reverse && rarityMeta(p.rarity).hit && !minor.includes(p.rarity);
@@ -36,12 +39,14 @@ function hitTier(rarity: string) {
   return 1;
 }
 
-export function PackOpening({ owner, demo = false, minor, pulls, packImage, setName, price, onClose, onAgain }: Props) {
+export function PackOpening({ free = false, minor, pulls, packImage, setName, price, proof, onSell, onClose, next: after }: Props) {
   const [phase, setPhase] = useState<Phase>("sealed");
   const [shown, setShown] = useState(0); // number of cards revealed
   const [suspense, setSuspense] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<{ total: number; count: number } | null>(null);
+  const [selling, setSelling] = useState(false);
+  const [sellError, setSellError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const total = useMemo(() => pulls.reduce((a, p) => a + p.value, 0), [pulls]);
@@ -172,7 +177,7 @@ export function PackOpening({ owner, demo = false, minor, pulls, packImage, setN
           </button>
           {phase === "sealed" ? (
             <div className="flex flex-col items-center gap-3 text-center">
-              <p className="hud text-dim">{demo ? "Free demo rip" : "Payment confirmed"} · {pulls.length} cards sealed inside</p>
+              <p className="hud text-dim">{free ? "Free pack from a mission" : "Payment confirmed on BNB Chain"} · {pulls.length} cards sealed inside</p>
               <button type="button" onClick={tear} className="btn btn-holo">
                 Tear open
               </button>
@@ -254,7 +259,7 @@ export function PackOpening({ owner, demo = false, minor, pulls, packImage, setN
                   )}
                   <p className="mt-1 flex items-center justify-center gap-3">
                     <RarityTag rarity={current.rarity} />
-                    <span className="hud text-dim">{fmtUSDC(current.value)}</span>
+                    <span className="hud text-dim">{fmtUSDT(current.value)}</span>
                   </p>
                 </div>
               )}
@@ -286,7 +291,7 @@ export function PackOpening({ owner, demo = false, minor, pulls, packImage, setN
               <span>
                 {String(shown).padStart(2, "0")} / {pulls.length}
               </span>
-              <span>Value {fmtUSDC(revealedValue)}</span>
+              <span>Value {fmtUSDT(revealedValue)}</span>
             </div>
             <ol className="flex flex-col border-t border-line">
               {pulls.map((p, i) => (
@@ -299,7 +304,7 @@ export function PackOpening({ owner, demo = false, minor, pulls, packImage, setN
                         </span>
                         <span className="truncate normal-case">{p.card.name}</span>
                       </span>
-                      <span className="text-dim tabular-nums">{fmtUSDC(p.value)}</span>
+                      <span className="text-dim tabular-nums">{fmtUSDT(p.value)}</span>
                     </>
                   ) : (
                     <span className="text-faint">— {p.slot}</span>
@@ -318,16 +323,16 @@ export function PackOpening({ owner, demo = false, minor, pulls, packImage, setN
             <div>
               <p className="pixel text-[10px] text-dim">Rip complete · {setName}</p>
               <h2 className="poke-title mt-3 text-[clamp(2rem,4.4vw,3.2rem)] leading-none">
-                {fmtUSDC(total)} <span className="text-dim">pulled</span>
+                {fmtUSDT(total)} <span className="text-dim">pulled</span>
               </h2>
               <p className="hud mt-3 text-dim">
-                {demo ? "Free demo rip" : `Paid ${price.toFixed(2)} USDC`} · Best pull {best.card.name} ({fmtUSDC(best.value)})
-                {!demo && (
+                {free ? "Free mission pack" : `Paid ${price.toFixed(2)} USDT`} · Best pull {best.card.name} ({fmtUSDT(best.value)})
+                {!free && (
                   <>
                     {" "}·{" "}
                     <span className={total >= price ? "text-ok" : "text-dim"}>
                       {total >= price ? "+" : "−"}
-                      {fmtUSDC(Math.abs(total - price))} vs pack
+                      {fmtUSDT(Math.abs(total - price))} vs pack
                     </span>
                   </>
                 )}
@@ -360,9 +365,9 @@ export function PackOpening({ owner, demo = false, minor, pulls, packImage, setN
                       <span className="block truncate text-[13px]">{p.card.name}</span>
                       <RarityTag rarity={p.rarity} className="mt-1" />
                       <span className="hud mt-1 flex items-center justify-between text-dim">
-                        <span>{fmtUSDC(p.value)}</span>
+                        <span>{fmtUSDT(p.value)}</span>
                         <span className={on ? "text-ok" : "group-hover:text-phosphor"}>
-                          {on ? "■" : "□"} Sell {fmtUSDC(buybackFor(p.value))}
+                          {on ? "■" : "□"} Sell {fmtUSDT(buybackFor(p.value))}
                         </span>
                       </span>
                     </span>
@@ -377,12 +382,17 @@ export function PackOpening({ owner, demo = false, minor, pulls, packImage, setN
               <p className="hud text-dim">
                 {selected.size ? (
                   <>
-                    {selected.size} selected · instant buyback <span className="text-phosphor">{fmtUSDC(selectedValue)}</span>
+                    {selected.size} selected · instant buyback <span className="text-phosphor">{fmtUSDT(selectedValue)}</span>
                   </>
                 ) : (
-                  "Unselected cards stay in your vault. Ship them home anytime."
+                  "Unselected cards stay in your vault. Ship them home or list them on the PokéMart anytime."
                 )}
               </p>
+              {sellError && (
+                <p role="alert" className="hud w-full text-poke-red">
+                  {sellError}
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -397,14 +407,23 @@ export function PackOpening({ owner, demo = false, minor, pulls, packImage, setN
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={!selected.size}
-                  onClick={() => {
-                    setResult(sellBack(owner, [...selected]));
-                    sfx.coin();
-                    setPhase("done");
+                  disabled={!selected.size || selling}
+                  onClick={async () => {
+                    setSelling(true);
+                    setSellError(null);
+                    try {
+                      setResult(await onSell([...selected]));
+                      sfx.coin();
+                      setPhase("done");
+                    } catch (e) {
+                      sfx.error();
+                      setSellError(e instanceof Error ? e.message : "Buyback failed");
+                    } finally {
+                      setSelling(false);
+                    }
                   }}
                 >
-                  Sell back {selected.size || ""} for {fmtUSDC(selectedValue)}
+                  {selling ? "Requesting…" : `Sell back ${selected.size || ""} for ${fmtUSDT(selectedValue)}`}
                 </button>
               </div>
             </div>
@@ -418,20 +437,23 @@ export function PackOpening({ owner, demo = false, minor, pulls, packImage, setN
           <p className="pixel text-[10px] text-ok">Transmission received</p>
           <h2 className="poke-title fade-up max-w-[22ch] text-[clamp(2rem,4.4vw,3.2rem)] leading-tight">
             {result.count
-              ? `${result.total.toFixed(2)} USDC credited for ${result.count} card${result.count > 1 ? "s" : ""}.`
+              ? `Buyback requested: ${result.total.toFixed(2)} USDT for ${result.count} card${result.count > 1 ? "s" : ""}.`
               : `All ${pulls.length} cards are in your vault.`}
           </h2>
           <p className="hud max-w-[52ch] text-dim">
             {result.count && result.count < pulls.length
               ? `${pulls.length - result.count} card${pulls.length - result.count === 1 ? "" : "s"} kept in your vault. `
               : ""}
-            {demo
-              ? "This was a free demo rip — connect a wallet on BNB Chain to rip for real."
-              : "Demo mode — balances are simulated and no USDC moved on-chain."}
+            {result.count ? "The USDT is sent to your wallet once the payout is processed — track it in your vault." : ""}
           </p>
+          {proof && (
+            <p className="hud max-w-[60ch] break-all text-faint">
+              Provably fair · server seed hash {proof.serverSeedHash.slice(0, 16)}… · client seed {proof.clientSeed} · nonce {proof.nonce}
+            </p>
+          )}
           <div className="mt-2 flex flex-wrap justify-center gap-3">
-            <button type="button" className="btn btn-holo" onClick={onAgain}>
-              {demo ? "Another demo rip" : "Rip another"}
+            <button type="button" className="btn btn-holo" onClick={after.run}>
+              {after.label}
             </button>
             <Link href="/vault" className="btn">
               Open vault

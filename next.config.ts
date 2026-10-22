@@ -4,6 +4,8 @@ const empty = "./src/lib/empty-module.ts";
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  // embedded Postgres for local development ships its own WASM; keep it out of the bundle
+  serverExternalPackages: ["@electric-sql/pglite"],
   partialPrefetching: true,
   turbopack: {
     rules: {
