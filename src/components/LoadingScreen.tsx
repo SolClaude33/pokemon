@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "@/lib/useClient";
 
-const MESSAGES = ["Tuning channel…", "Shuffling 10 cards…", "Checking the odds…", "Sealing the foil…", "Warming up the CRT…"];
+const MESSAGES = ["Tuning channel…", "Shuffling the cards…", "Checking the odds…", "Sealing the foil…", "Warming up the CRT…"];
 
 type Phase = "loading" | "exiting" | "gone";
 

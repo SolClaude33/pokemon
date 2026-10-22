@@ -12,6 +12,8 @@ export type PackSpec = {
   packImage: string;
   logo: string;
   accent: string;
+  /** cards per pack, printed on the generated back */
+  cards?: number;
 };
 
 type Props = { pack: PackSpec; height?: number; thickness?: number } & ThreeElements["group"];

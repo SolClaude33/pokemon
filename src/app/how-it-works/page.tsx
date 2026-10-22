@@ -23,7 +23,7 @@ const STEPS = [
   {
     n: "04",
     title: "Rip it on air",
-    body: "Tear the seal and flip your 10 cards one by one: 4 Common, 3 Uncommon, 2 reverse holos (one can upgrade to a hit) and a Rare or better.",
+    body: "Tear the seal and flip every card one by one: 10 in modern packs (4 Common, 3 Uncommon, 2 reverse holos — one can upgrade to a hit — and a Rare or better), 11 in the vintage 1999 Base Set.",
   },
   {
     n: "05",

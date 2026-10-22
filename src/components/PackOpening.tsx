@@ -151,7 +151,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
           </button>
           {phase === "sealed" ? (
             <div className="flex flex-col items-center gap-3 text-center">
-              <p className="hud text-dim">{demo ? "Free demo rip" : "Payment confirmed"} · 10 cards sealed inside</p>
+              <p className="hud text-dim">{demo ? "Free demo rip" : "Payment confirmed"} · {pulls.length} cards sealed inside</p>
               <button type="button" onClick={tear} className="btn btn-holo">
                 Tear open
               </button>
@@ -390,7 +390,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
           <h2 className="poke-title fade-up max-w-[22ch] text-[clamp(2rem,4.4vw,3.2rem)] leading-tight">
             {result.count
               ? `${result.total.toFixed(2)} USDC credited for ${result.count} card${result.count > 1 ? "s" : ""}.`
-              : "All 10 cards are in your vault."}
+              : `All ${pulls.length} cards are in your vault.`}
           </h2>
           <p className="hud max-w-[52ch] text-dim">
             {result.count && result.count < pulls.length

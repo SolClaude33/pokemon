@@ -7,7 +7,7 @@ import { useMounted } from "@/lib/useClient";
 import { useAccount } from "wagmi";
 import { bsc } from "wagmi/chains";
 import { buildPool, drawPack, fmtUSDC, type Card, type Pull } from "@/lib/odds";
-import { ECONOMICS, type PackConfig } from "@/lib/packs";
+import { ECONOMICS, packSize, type PackConfig } from "@/lib/packs";
 import { DEMO_OWNER, recordPack } from "@/lib/vault";
 import { PackOpening } from "./PackOpening";
 import { WalletButton, useUsdcBalance } from "./WalletButton";
@@ -52,7 +52,7 @@ export function PackStation({ pack, cards, setName, packImage, ev }: Props) {
     setTimeout(() => {
       try {
         const result = drawPack(pack, pool);
-        if (result.length !== 10) throw new Error("Pack draw failed");
+        if (result.length !== packSize(pack)) throw new Error("Pack draw failed");
         recordPack(who, result, { setId: pack.setId, setName, price: guest ? 0 : pack.price });
         setPulls(result);
         setStatus("idle");
@@ -68,7 +68,7 @@ export function PackStation({ pack, cards, setName, packImage, ev }: Props) {
   return (
     <div className="border border-line bg-[#0b0d11]/70 p-5 backdrop-blur-sm">
       <div className="flex items-baseline justify-between gap-4">
-        <p className="hud text-dim">1 sealed booster · 10 cards</p>
+        <p className="hud text-dim">1 sealed booster · {packSize(pack)} cards</p>
         <p className="font-display text-3xl">
           {pack.price.toFixed(2)} <span className="hud not-italic text-dim">USDC</span>
         </p>

@@ -21,6 +21,7 @@ export type ArcPack = {
   packImage: string;
   logo: string;
   accent: string;
+  cards: number;
   ev: number;
   topHit: { name: string; price: number } | null;
 };
@@ -52,7 +53,7 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
   const n = packs.length;
   const onReady = useCallback(() => setReady3d(true), []);
   const specs = useMemo(
-    () => packs.map((p) => ({ setId: p.setId, setName: p.name, packImage: p.packImage, logo: p.logo, accent: p.accent })),
+    () => packs.map((p) => ({ setId: p.setId, setName: p.name, packImage: p.packImage, logo: p.logo, accent: p.accent, cards: p.cards })),
     [packs],
   );
   const current = packs[active];

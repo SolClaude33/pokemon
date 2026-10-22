@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-22T17:04:18.239Z",
+  "generatedAt": "2026-10-22T18:36:47.597Z",
   "sets": [
     {
       "id": "me2pt5",
@@ -115,6 +115,25 @@
         "Ultra Rare",
         "Special Illustration Rare",
         "Hyper Rare"
+      ]
+    },
+    {
+      "id": "base1",
+      "name": "Base Set",
+      "series": "Base",
+      "releaseDate": "1999/01/09",
+      "printedTotal": 102,
+      "total": 102,
+      "cardCount": 101,
+      "logo": "/assets/sets/base1-logo.webp",
+      "packImage": "/assets/packs/base1.webp",
+      "packMarketPrice": 930.89,
+      "tcgplayerPackId": 138130,
+      "rarities": [
+        "Rare Holo",
+        "Rare",
+        "Uncommon",
+        "Common"
       ]
     }
   ]

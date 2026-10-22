@@ -65,7 +65,7 @@ function cssFont(variable: string, fallback: string) {
 const backCache = new Map<string, THREE.CanvasTexture>();
 
 /** Original pack back: set logo, a Poké Ball watermark, product line and a barcode. */
-export async function packBackTexture(opts: { setId: string; logo: string; accent: string; setName: string }) {
+export async function packBackTexture(opts: { setId: string; logo: string; accent: string; setName: string; cards?: number }) {
   const cached = backCache.get(opts.setId);
   if (cached) return cached;
 
@@ -166,7 +166,7 @@ export async function packBackTexture(opts: { setId: string; logo: string; accen
   ctx.fillText("REAL SEALED BOOSTER", W / 2, H * 0.78);
   ctx.globalAlpha = 0.7;
   ctx.font = `11px ${pixel}`;
-  ctx.fillText("10 CARDS · RIPPED LIVE ON AIR", W / 2, H * 0.805);
+  ctx.fillText(`${opts.cards ?? 10} CARDS · RIPPED LIVE ON AIR`, W / 2, H * 0.805);
   ctx.globalAlpha = 1;
 
   // barcode

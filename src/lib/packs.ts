@@ -36,6 +36,10 @@ export type PackConfig = {
   tagline: string;
   /** UI tint taken from the pack art */
   accent: string;
+  /** what's inside, shown above the odds table */
+  contents: string;
+  /** what counts as a hit for the headline "chance of a hit" */
+  hitLabel: string;
   slots: Slot[];
   sources: { label: string; url: string }[];
 };
@@ -48,13 +52,33 @@ const baseSlots = (hit: Record<string, number>, rare: Record<string, number>): S
   { label: "Rare", count: 1, fill: "Rare", odds: rare },
 ];
 
+const MODERN_CONTENTS = "4 Common · 3 Uncommon · 2 reverse holo (one can upgrade to a hit) · 1 Rare or better.";
+
 export const PACKS: PackConfig[] = [
   {
-    setId: "me2pt5",
+    setId: "base1",
     channel: 1,
+    // TCGplayer market for a sealed Unlimited booster was ~931 USD (Oct 2026); placeholder price
+    price: 999,
+    tagline: "1999 Base Set. The original pack — and the holo Charizard everyone still chases.",
+    accent: "#ff7a2f",
+    contents: "11 cards: 7 Common (energy included) · 3 Uncommon · 1 Rare — about one pack in three upgrades that rare to a holo.",
+    hitLabel: "Holo rare",
+    slots: [
+      { label: "Common", count: 7, fill: "Common" },
+      { label: "Uncommon", count: 3, fill: "Uncommon" },
+      { label: "Rare / holo", count: 1, fill: "Rare", odds: { "Rare Holo": 1 / 3 } },
+    ],
+    sources: [{ label: "Bulbapedia — Base Set (TCG)", url: "https://bulbapedia.bulbagarden.net/wiki/Base_Set_(TCG)" }],
+  },
+  {
+    setId: "me2pt5",
+    channel: 2,
     price: 12.5,
     tagline: "Every hero, one rip. The set with the god-pack rumours.",
     accent: "#f2b84b",
+    contents: MODERN_CONTENTS,
+    hitLabel: "Double Rare or better",
     slots: baseSlots(
       { "Illustration Rare": 1 / 18, "Special Illustration Rare": 1 / 80, "Mega Hyper Rare": 1 / 540 },
       // Mega Attack Rares take the Ultra Rare's place in the rare slot.
@@ -68,10 +92,12 @@ export const PACKS: PackConfig[] = [
   },
   {
     setId: "me2",
-    channel: 2,
+    channel: 3,
     price: 12.5,
     tagline: "Mega Charizard X burns blue. Chase the gold.",
     accent: "#5ec8ff",
+    contents: MODERN_CONTENTS,
+    hitLabel: "Double Rare or better",
     slots: baseSlots(
       { "Illustration Rare": 1 / 12, "Special Illustration Rare": 1 / 80, "Mega Hyper Rare": 1 / 1260 },
       { "Double Rare": 1 / 5, "Ultra Rare": 1 / 15 },
@@ -83,10 +109,12 @@ export const PACKS: PackConfig[] = [
   },
   {
     setId: "me1",
-    channel: 3,
+    channel: 4,
     price: 10,
     tagline: "Mega Evolution returns. Lucario and Gardevoir in gold.",
     accent: "#b38cff",
+    contents: MODERN_CONTENTS,
+    hitLabel: "Double Rare or better",
     slots: baseSlots(
       { "Illustration Rare": 1 / 10, "Special Illustration Rare": 1 / 80, "Mega Hyper Rare": 1 / 1260 },
       { "Double Rare": 1 / 5, "Ultra Rare": 1 / 15 },
@@ -98,10 +126,12 @@ export const PACKS: PackConfig[] = [
   },
   {
     setId: "sv8pt5",
-    channel: 4,
+    channel: 5,
     price: 15,
     tagline: "Eevee and all eight evolutions. The SIR rate everyone talks about.",
     accent: "#ff8ad8",
+    contents: MODERN_CONTENTS,
+    hitLabel: "Double Rare or better",
     slots: baseSlots(
       { "ACE SPEC Rare": 1 / 20, "Special Illustration Rare": 1 / 45, "Hyper Rare": 1 / 180 },
       { "Double Rare": 1 / 5, "Ultra Rare": 1 / 13 },
@@ -113,10 +143,12 @@ export const PACKS: PackConfig[] = [
   },
   {
     setId: "sv3pt5",
-    channel: 5,
+    channel: 6,
     price: 29,
     tagline: "The original 151. Charizard, Mew, and Venusaur in illustration.",
     accent: "#ff5f6d",
+    contents: MODERN_CONTENTS,
+    hitLabel: "Double Rare or better",
     slots: baseSlots(
       { "Illustration Rare": 1 / 11.8, "Special Illustration Rare": 1 / 32.2, "Hyper Rare": 1 / 51.5 },
       { "Double Rare": 1 / 7.5, "Ultra Rare": 1 / 16 },
@@ -124,6 +156,8 @@ export const PACKS: PackConfig[] = [
     sources: [{ label: "Card Codex", url: "https://cardcodex.com/pokemon/scarlet-violet/151/151-booster-pack-sv3pt5/" }],
   },
 ];
+
+export const packSize = (p: Pick<PackConfig, "slots">) => p.slots.reduce((a, s) => a + s.count, 0);
 
 export const packBySetId = (id: string) => PACKS.find((p) => p.setId === id);
 

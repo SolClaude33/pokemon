@@ -1,6 +1,7 @@
 import { PackArc, type ArcPack } from "@/components/PackArc";
 import { getPack, listPacks } from "@/lib/catalog";
 import { buildPool, chaseCards, expectedValue } from "@/lib/odds";
+import { packSize } from "@/lib/packs";
 
 export default function Home() {
   const packs: ArcPack[] = listPacks().map((p) => {
@@ -16,6 +17,7 @@ export default function Home() {
       packImage: p.set.packImage,
       logo: p.set.logo,
       accent: p.accent,
+      cards: packSize(p),
       ev: expectedValue(p, buildPool(cards)),
       topHit: top ? { name: top.name, price: top.price ?? 0 } : null,
     };

@@ -22,6 +22,10 @@ const SETS = [
   { id: "me1", tcgplayerPackId: 644352 },
   { id: "sv8pt5", tcgplayerPackId: 593294 },
   { id: "sv3pt5", tcgplayerPackId: 504467 },
+  // 1999 Base Set (Unlimited) — home of the famous holo Charizard #4/102
+  // exclude: cards never found in boosters (Machamp holo only came in starter decks)
+  // basic energy has no rarity symbol but fills the common slots of 1999 boosters
+  { id: "base1", tcgplayerPackId: 138130, exclude: ["8"], name: "Base Set", energyAsCommon: true },
 ];
 
 const API = "https://api.pokemontcg.io/v2";
@@ -139,7 +143,8 @@ for (const s of SETS) {
   console.log(`  ${cards.length} cards`);
 
   const out = cards
-    .filter((c) => c.rarity)
+    .map((c) => (!c.rarity && s.energyAsCommon && c.supertype === "Energy" ? { ...c, rarity: "Common" } : c))
+    .filter((c) => c.rarity && !s.exclude?.includes(c.number))
     .map((c) => {
       const { price, reversePrice, updatedAt } = prices(c.tcgplayer);
       return {
@@ -188,7 +193,7 @@ for (const s of SETS) {
   const pack = await tcgplayerPack(s.tcgplayerPackId);
   const meta = {
     id: s.id,
-    name: set.name,
+    name: s.name ?? set.name,
     series: set.series,
     releaseDate: set.releaseDate,
     printedTotal: set.printedTotal,

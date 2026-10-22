@@ -8,7 +8,7 @@ import { PackStation } from "@/components/PackStation";
 import { RarityTag, TcgCard } from "@/components/TcgCard";
 import { catalogGeneratedAt, getPack, listPacks } from "@/lib/catalog";
 import { buildPool, cardOdds, chaseCards, expectedValue, fmtOneIn, fmtPct, fmtUSDC, rarityOdds } from "@/lib/odds";
-import { ECONOMICS } from "@/lib/packs";
+import { ECONOMICS, packSize } from "@/lib/packs";
 import { rarityMeta } from "@/lib/rarity";
 
 export function generateStaticParams() {
@@ -75,7 +75,7 @@ function PackContent({ id }: { id: string }) {
         {/* hero */}
         <div className="mt-6 grid items-start gap-10 md:grid-cols-[minmax(220px,320px)_1fr] lg:gap-16">
           <div className="mx-auto w-[min(62vw,320px)] md:sticky md:top-28 md:w-full">
-            <PackHero pack={{ setId: pack.setId, setName: pack.set.name, packImage: pack.set.packImage, logo: pack.set.logo, accent: pack.accent }} />
+            <PackHero pack={{ setId: pack.setId, setName: pack.set.name, packImage: pack.set.packImage, logo: pack.set.logo, accent: pack.accent, cards: packSize(pack) }} />
           </div>
 
           <div className="fade-up">
@@ -112,7 +112,9 @@ function PackContent({ id }: { id: string }) {
                 <div>
                   <p className="hud text-faint">[Chance of a hit]</p>
                   <p className="mt-1 font-display text-4xl">{fmtPct(hitChance)}</p>
-                  <p className="hud mt-1 text-dim">Double Rare or better · {fmtOneIn(hitChance)}</p>
+                  <p className="hud mt-1 text-dim">
+                    {pack.hitLabel} · {fmtOneIn(hitChance)}
+                  </p>
                 </div>
                 <div>
                   <p className="hud text-faint">[Sell-back EV]</p>
@@ -134,7 +136,7 @@ function PackContent({ id }: { id: string }) {
               </h2>
             </div>
             <p className="hud max-w-[52ch] text-dim">
-              Per-pack chance of pulling each rarity. 4 Common · 3 Uncommon · 2 reverse holo (one can upgrade to a hit) · 1 Rare or better.
+              Per-pack chance of pulling each rarity. {pack.contents}
             </p>
           </div>
 
