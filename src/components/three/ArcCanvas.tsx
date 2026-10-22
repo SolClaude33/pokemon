@@ -1,6 +1,6 @@
 "use client";
 
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { Pack3D, StudioLights, type PackSpec } from "./Pack3D";
@@ -20,18 +20,18 @@ const PACK_H = 2.4;
 const FOV = 32;
 
 /** Keeps the active pack at a fixed share of the viewport on any aspect ratio. */
+function fitCamera(camera: THREE.Camera, width: number, height: number, lift: number) {
+  const aspect = width / height;
+  const tan = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+  const byHeight = (PACK_H * 1.06) / 0.5;
+  const byWidth = (PACK_H * 0.548 * 1.06) / (0.56 * aspect);
+  const z = Math.max(byHeight, byWidth) / (2 * tan);
+  camera.position.set(0, -2 * z * tan * lift, z);
+}
+
 function FitCamera({ lift }: { lift: number }) {
-  const { camera, size } = useThree();
-  useEffect(() => {
-    const aspect = size.width / size.height;
-    const tan = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
-    const byHeight = (PACK_H * 1.06) / 0.5;
-    const byWidth = (PACK_H * 0.548 * 1.06) / (0.56 * aspect);
-    const z = Math.max(byHeight, byWidth) / (2 * tan);
-    const visibleH = 2 * z * tan;
-    camera.position.set(0, -visibleH * lift, z);
-    camera.updateProjectionMatrix();
-  }, [camera, size, lift]);
+  // runs before every render (priority -1), so even the first frame is framed right
+  useFrame(({ camera, size }) => fitCamera(camera, size.width, size.height, lift), -1);
   return null;
 }
 
@@ -42,7 +42,10 @@ function Wheel({ packs, active, reducedMotion, onSelect, onOpen, onReady }: Prop
   const refs = useRef<(THREE.Group | null)[]>([]);
   // runs once the pack textures resolved (this component suspends until then)
   useEffect(() => {
-    const id = requestAnimationFrame(() => onReady());
+    // wait two frames so the packs have been drawn in place before revealing
+    let id = requestAnimationFrame(() => {
+      id = requestAnimationFrame(() => onReady());
+    });
     return () => cancelAnimationFrame(id);
   }, [onReady]);
   const cursor = useRef(active);

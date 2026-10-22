@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtUSDC } from "@/lib/odds";
-import { useReducedMotion, useWebGL } from "@/lib/useClient";
+import { useMounted, useReducedMotion, useWebGL } from "@/lib/useClient";
+import { LogoMark } from "./Logo";
 import { PackArt } from "./PackArt";
 
 const ArcCanvas = dynamic(() => import("./three/ArcCanvas"), { ssr: false });
@@ -39,7 +40,13 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
   const [active, setActive] = useState(0);
   const [hint, setHint] = useState(true);
   const [ready3d, setReady3d] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
+  const mounted = useMounted();
   const webgl = useWebGL();
+  // 3D when possible; the CSS arc only without WebGL or if the scene never loads
+  const use3d = webgl && !timedOut;
+  const showCss = mounted && !use3d;
+  const loading = !mounted || (use3d && !ready3d);
   const reducedMotion = useReducedMotion();
   const touch = useRef<number | null>(null);
   const n = packs.length;
@@ -58,6 +65,12 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
   useEffect(() => {
     packs.forEach((p) => router.prefetch(`/packs/${p.setId}`));
   }, [packs, router]);
+
+  useEffect(() => {
+    if (!webgl || ready3d) return;
+    const t = setTimeout(() => setTimedOut(true), 10_000);
+    return () => clearTimeout(t);
+  }, [webgl, ready3d]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -93,7 +106,8 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
         }}
       />
 
-      {webgl && (
+      {use3d && (
+        <div className={`absolute inset-0 transition-opacity duration-700 ${ready3d ? "opacity-100" : "opacity-0"}`}>
         <ArcCanvas
           packs={specs}
           active={active}
@@ -105,10 +119,12 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
           }}
           onOpen={(i) => router.push(`/packs/${packs[i].setId}`)}
         />
+        </div>
       )}
 
-      {/* CSS arc: first paint, and the fallback without WebGL */}
-      <div className={`arc-stage transition-opacity duration-500 ${ready3d ? "invisible opacity-0" : ""}`}>
+      {/* CSS arc: fallback without WebGL */}
+      {showCss && (
+      <div className="arc-stage">
         {packs.map((p, i) => {
           const d = offset(i, active, n);
           const ad = Math.abs(d);
@@ -144,6 +160,19 @@ export function PackArc({ packs }: { packs: ArcPack[] }) {
             </div>
           );
         })}
+      </div>
+      )}
+
+      {/* loading screen: hides the stage until the 3D packs are in their final place */}
+      <div
+        role="status"
+        aria-label="Loading packs"
+        aria-hidden={!loading}
+        className={`absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 bg-screen transition-opacity duration-700 ${loading ? "opacity-100" : "pointer-events-none opacity-0"}`}
+      >
+        <LogoMark size={72} className="animate-pulse" />
+        <p className="pixel text-dim">Tuning channel…</p>
+        <div className="boot-bar w-[min(60vw,320px)] animate-pulse" />
       </div>
 
       {/* caption under the active pack, Arc-style */}

@@ -10,7 +10,9 @@ function Spinner({ pack, reducedMotion, onReady }: { pack: PackSpec; reducedMoti
   const drag = useRef({ spin: 0, velocity: 0, dragging: false, lastX: 0 });
 
   useEffect(() => {
-    const id = requestAnimationFrame(onReady);
+    let id = requestAnimationFrame(() => {
+      id = requestAnimationFrame(onReady);
+    });
     return () => cancelAnimationFrame(id);
   }, [onReady]);
 
@@ -67,7 +69,7 @@ function Spinner({ pack, reducedMotion, onReady }: { pack: PackSpec; reducedMoti
 export default function PackViewer({ pack, reducedMotion, onReady }: { pack: PackSpec; reducedMotion: boolean; onReady: () => void }) {
   return (
     <div className="absolute inset-[-8%] cursor-grab touch-pan-y active:cursor-grabbing">
-      <Canvas flat dpr={[1, 2]} camera={{ position: [0, 0, 5.2], fov: 32 }} gl={{ antialias: true, alpha: true }} aria-hidden="true">
+      <Canvas flat dpr={[1, 2]} camera={{ position: [0, 0, 4.85], fov: 32 }} gl={{ antialias: true, alpha: true }} aria-hidden="true">
         <StudioLights accent={pack.accent} />
         <Suspense fallback={null}>
           <Spinner pack={pack} reducedMotion={reducedMotion} onReady={onReady} />
