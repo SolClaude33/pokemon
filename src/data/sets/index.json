@@ -1,0 +1,121 @@
+{
+  "generatedAt": "2026-10-22T17:04:18.239Z",
+  "sets": [
+    {
+      "id": "me2pt5",
+      "name": "Ascended Heroes",
+      "series": "Mega Evolution",
+      "releaseDate": "2026/01/30",
+      "printedTotal": 217,
+      "total": 295,
+      "cardCount": 295,
+      "logo": "/assets/sets/me2pt5-logo.webp",
+      "packImage": "/assets/packs/me2pt5.webp",
+      "packMarketPrice": 10.58,
+      "tcgplayerPackId": 672434,
+      "rarities": [
+        "Common",
+        "Uncommon",
+        "Double Rare",
+        "Rare",
+        "Illustration Rare",
+        "Ultra Rare",
+        "Mega Attack Rare",
+        "Special Illustration Rare",
+        "Mega Hyper Rare"
+      ]
+    },
+    {
+      "id": "me2",
+      "name": "Phantasmal Flames",
+      "series": "Mega Evolution",
+      "releaseDate": "2025/11/14",
+      "printedTotal": 94,
+      "total": 130,
+      "cardCount": 130,
+      "logo": "/assets/sets/me2-logo.webp",
+      "packImage": "/assets/packs/me2.webp",
+      "packMarketPrice": 11.55,
+      "tcgplayerPackId": 654144,
+      "rarities": [
+        "Common",
+        "Rare",
+        "Double Rare",
+        "Uncommon",
+        "Illustration Rare",
+        "Ultra Rare",
+        "Special Illustration Rare",
+        "Mega Hyper Rare"
+      ]
+    },
+    {
+      "id": "me1",
+      "name": "Mega Evolution",
+      "series": "Mega Evolution",
+      "releaseDate": "2025/09/26",
+      "printedTotal": 132,
+      "total": 188,
+      "cardCount": 188,
+      "logo": "/assets/sets/me1-logo.webp",
+      "packImage": "/assets/packs/me1.webp",
+      "packMarketPrice": 9.07,
+      "tcgplayerPackId": 644352,
+      "rarities": [
+        "Common",
+        "Double Rare",
+        "Uncommon",
+        "Rare",
+        "Illustration Rare",
+        "Ultra Rare",
+        "Special Illustration Rare",
+        "Mega Hyper Rare"
+      ]
+    },
+    {
+      "id": "sv8pt5",
+      "name": "Prismatic Evolutions",
+      "series": "Scarlet & Violet",
+      "releaseDate": "2025/01/17",
+      "printedTotal": 131,
+      "total": 180,
+      "cardCount": 180,
+      "logo": "/assets/sets/sv8pt5-logo.webp",
+      "packImage": "/assets/packs/sv8pt5.webp",
+      "packMarketPrice": 13.91,
+      "tcgplayerPackId": 593294,
+      "rarities": [
+        "Common",
+        "Uncommon",
+        "Rare",
+        "Double Rare",
+        "ACE SPEC Rare",
+        "Ultra Rare",
+        "Special Illustration Rare",
+        "Hyper Rare"
+      ]
+    },
+    {
+      "id": "sv3pt5",
+      "name": "151",
+      "series": "Scarlet & Violet",
+      "releaseDate": "2023/09/22",
+      "printedTotal": 165,
+      "total": 207,
+      "cardCount": 207,
+      "logo": "/assets/sets/sv3pt5-logo.webp",
+      "packImage": "/assets/packs/sv3pt5.webp",
+      "packMarketPrice": 27.36,
+      "tcgplayerPackId": 504467,
+      "rarities": [
+        "Common",
+        "Uncommon",
+        "Double Rare",
+        "Rare",
+        "Illustration Rare",
+        "Ultra Rare",
+        "Special Illustration Rare",
+        "Hyper Rare"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,593 @@
+@import "tailwindcss";
+
+/* ───────────────────────── HOLOVISION design tokens ─────────────────────────
+   Mood: a late-night CRT shopping channel that rips real booster packs on air.
+   Phosphor-white type on blue-black glass; the only saturated color is holo foil
+   and rarity light. Avoid: purple SaaS gradients, rounded "app" cards, emoji. */
+:root {
+  --bezel: #050506;
+  --screen: #0b0d11;
+  --screen-2: #11141a;
+  --phosphor: #ece6d6;
+  --dim: #9a958a;
+  --faint: #5b5850;
+  --line: rgb(236 230 214 / 0.14);
+  --line-strong: rgb(236 230 214 / 0.32);
+  --signal: #ff4433;
+  --ok: #7dffb6;
+  --warn: #ffc24a;
+
+  --holo: linear-gradient(
+    115deg,
+    #ff5f6d 0%,
+    #ffc371 18%,
+    #f9f871 32%,
+    #6dffb3 48%,
+    #5ec8ff 64%,
+    #a78bfa 80%,
+    #ff6fd8 100%
+  );
+  --gold: linear-gradient(135deg, #fff1b8 0%, #f5c84c 35%, #b8862b 60%, #ffe58a 100%);
+
+  /* rarity light */
+  --r-common: #a29e94;
+  --r-uncommon: #6fd3c1;
+  --r-rare: #6ea8ff;
+  --r-double: #b38cff;
+  --r-ace: #ff6b9a;
+  --r-illus: #ffb547;
+  --r-ultra: #e9edf5;
+  --r-mega: #ff7a45;
+  --r-sir: #ff8ad8;
+  --r-hyper: #f5c84c;
+
+  --radius-screen: 34px;
+  --radius-card: 4.6% / 3.3%;
+  --radius-ui: 2px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --t-fast: 160ms;
+  --t-med: 420ms;
+  --t-slow: 900ms;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bezel: var(--bezel);
+  --color-screen: var(--screen);
+  --color-screen-2: var(--screen-2);
+  --color-phosphor: var(--phosphor);
+  --color-dim: var(--dim);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-signal: var(--signal);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --font-display: var(--font-bodoni);
+  --font-mono: var(--font-fragment);
+  --font-pixel: var(--font-silkscreen);
+  --text-hud: 0.6875rem;
+  --text-hud--line-height: 1.35;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bezel);
+  color: var(--phosphor);
+  font-family: var(--font-fragment), ui-monospace, monospace;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+::selection {
+  background: var(--phosphor);
+  color: var(--screen);
+}
+
+:focus-visible {
+  outline: 1px dashed var(--phosphor);
+  outline-offset: 3px;
+}
+
+.hud {
+  font-family: var(--font-fragment), monospace;
+  font-size: var(--text-hud);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pixel {
+  font-family: var(--font-silkscreen), monospace;
+  letter-spacing: 0.04em;
+}
+
+.holo-text {
+  background: var(--holo);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: holo-pan 6s linear infinite;
+}
+
+@keyframes holo-pan {
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* ─────────────────────────────── CRT shell ─────────────────────────────── */
+.tv {
+  position: fixed;
+  inset: 0;
+  padding: clamp(6px, 1.6vw, 22px);
+  background:
+    radial-gradient(120% 90% at 50% 0%, #17181b 0%, transparent 60%),
+    var(--bezel);
+}
+
+.screen {
+  position: relative;
+  height: 100%;
+  border-radius: var(--radius-screen);
+  overflow: hidden;
+  background:
+    radial-gradient(90% 70% at 50% 45%, var(--screen-2) 0%, var(--screen) 55%, #07080a 100%);
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 0 2px #1d1e21,
+    inset 0 0 120px 30px rgb(0 0 0 / 0.75),
+    inset 0 0 22px 4px rgb(0 0 0 / 0.9);
+  isolation: isolate;
+}
+
+.screen[data-bw="on"] .screen-content {
+  filter: grayscale(1) contrast(1.08);
+}
+
+.screen-content {
+  position: absolute;
+  inset: 0;
+  transition: filter var(--t-med) var(--ease-out);
+}
+
+/* scanlines + phosphor mask + glare, all non-interactive overlays */
+.crt-overlay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  border-radius: inherit;
+}
+
+.crt-scanlines {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.025) 0px,
+    rgb(255 255 255 / 0.025) 1px,
+    rgb(0 0 0 / 0.22) 2px,
+    rgb(0 0 0 / 0.22) 3px
+  );
+  mix-blend-mode: multiply;
+}
+
+.crt-mask {
+  background: repeating-linear-gradient(
+    90deg,
+    rgb(255 60 60 / 0.035) 0 1px,
+    rgb(60 255 120 / 0.035) 1px 2px,
+    rgb(80 120 255 / 0.035) 2px 3px
+  );
+}
+
+.crt-vignette {
+  background:
+    radial-gradient(120% 100% at 50% 50%, transparent 55%, rgb(0 0 0 / 0.55) 100%),
+    linear-gradient(to bottom, rgb(0 0 0 / 0.25), transparent 12%, transparent 88%, rgb(0 0 0 / 0.3));
+}
+
+.crt-glare {
+  background:
+    linear-gradient(
+      102deg,
+      transparent 58%,
+      rgb(255 255 255 / 0.045) 60%,
+      rgb(255 255 255 / 0.045) 69%,
+      transparent 70%,
+      transparent 73%,
+      rgb(255 255 255 / 0.035) 74%,
+      rgb(255 255 255 / 0.035) 79%,
+      transparent 80%
+    ),
+    radial-gradient(60% 30% at 50% 0%, rgb(255 255 255 / 0.05), transparent 70%);
+}
+
+.crt-flicker {
+  background: rgb(255 255 255 / 0.012);
+  animation: flicker 0.12s steps(2) infinite;
+}
+
+@keyframes flicker {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* boot loader barcode */
+.boot-bar {
+  height: 10px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--dim) 0 1px,
+    transparent 1px 3px,
+    var(--dim) 3px 4px,
+    transparent 4px 7px
+  );
+}
+
+.rec-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 8px var(--signal);
+  animation: rec 1.6s steps(1) infinite;
+}
+
+@keyframes rec {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+/* inner scroll area for routed pages */
+.channel-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* fade content out under the HUD rows */
+  --hud-fade: linear-gradient(
+    transparent 0,
+    transparent clamp(58px, 9vh, 86px),
+    #000 clamp(104px, 16vh, 150px),
+    #000 calc(100% - clamp(84px, 13vh, 124px)),
+    transparent calc(100% - clamp(46px, 7vh, 64px))
+  );
+  -webkit-mask-image: var(--hud-fade);
+  mask-image: var(--hud-fade);
+  scrollbar-width: thin;
+  scrollbar-color: var(--faint) transparent;
+}
+
+/* ─────────────────────────────── Buttons ─────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6em;
+  min-height: 44px;
+  padding: 0 1.25rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-ui);
+  font-family: var(--font-fragment), monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--phosphor);
+  background: rgb(236 230 214 / 0.03);
+  transition:
+    background var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out),
+    transform var(--t-fast) var(--ease-out);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  background: rgb(236 230 214 / 0.1);
+  border-color: var(--phosphor);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  color: var(--screen);
+  background: var(--phosphor);
+  border-color: var(--phosphor);
+}
+
+.btn-primary:hover:not(:disabled) {
+  color: var(--screen);
+  background: #fff;
+}
+
+.btn-holo {
+  position: relative;
+  color: #0b0d11;
+  border: 0;
+  background: var(--holo);
+  background-size: 200% 100%;
+  animation: holo-pan 5s linear infinite;
+  font-weight: 600;
+}
+
+.btn-holo:hover:not(:disabled) {
+  color: #0b0d11;
+  background: var(--holo);
+  background-size: 200% 100%;
+  filter: brightness(1.12) saturate(1.1);
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  min-height: 32px;
+  padding: 0 0.5rem;
+}
+
+.link-hud {
+  position: relative;
+  color: var(--phosphor);
+  transition: color var(--t-fast);
+}
+
+.link-hud:hover {
+  color: #fff;
+}
+
+.link-hud[aria-current="page"]::before {
+  content: "■ ";
+}
+
+/* ─────────────────────────────── Pack art ─────────────────────────────── */
+.pack {
+  position: relative;
+  aspect-ratio: 548 / 1000;
+  transform-style: preserve-3d;
+}
+
+.pack-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 3px;
+  /* crimped foil seals: zigzag strips top and bottom + solid body */
+  --crimp:
+    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / 8px 4px repeat-x,
+    linear-gradient(#000 0 0) center / 100% calc(100% - 8px) no-repeat,
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 8px 4px repeat-x;
+  -webkit-mask: var(--crimp);
+  mask: var(--crimp);
+}
+
+.pack-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 3px;
+  background:
+    linear-gradient(
+      var(--sheen-angle, 105deg),
+      transparent 30%,
+      rgb(255 255 255 / 0.32) 46%,
+      rgb(255 255 255 / 0.05) 52%,
+      transparent 60%
+    ),
+    linear-gradient(90deg, rgb(0 0 0 / 0.35), transparent 8%, transparent 92%, rgb(0 0 0 / 0.35));
+  background-size: 260% 100%, 100% 100%;
+  background-position: var(--sheen-x, 50%) 0, 0 0;
+  mix-blend-mode: screen;
+}
+
+/* ─────────────────────────────── Arc carousel ─────────────────────────────── */
+.arc-stage {
+  position: absolute;
+  inset: 0;
+  perspective: 1400px;
+  perspective-origin: 50% 40%;
+}
+
+.arc-item {
+  --pack-h: clamp(220px, 42vh, 400px);
+  --pack-w: calc(var(--pack-h) * 0.548);
+  position: absolute;
+  left: 50%;
+  top: clamp(88px, 14vh, 136px);
+  width: var(--pack-w);
+  margin-left: calc(var(--pack-w) / -2);
+  transform-origin: 50% 50%;
+  transition:
+    transform var(--t-slow) var(--ease-out),
+    filter var(--t-slow) var(--ease-out),
+    opacity var(--t-slow) var(--ease-out);
+  will-change: transform;
+}
+
+@media (max-width: 640px) {
+  .arc-item {
+    --pack-h: min(50vh, 112vw);
+    top: clamp(84px, 12vh, 110px);
+  }
+}
+
+.arc-item[data-active="true"] .pack {
+  animation: pack-float 4.2s var(--ease-in-out) infinite;
+}
+
+@keyframes pack-float {
+  0%,
+  100% {
+    transform: translateY(0) rotateY(-4deg);
+  }
+  50% {
+    transform: translateY(-8px) rotateY(4deg);
+  }
+}
+
+/* ─────────────────────────────── Cards ─────────────────────────────── */
+.tcg-card {
+  position: relative;
+  aspect-ratio: 734 / 1024;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: #15171c;
+  box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.8);
+}
+
+.tcg-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tcg-card[data-foil="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at var(--px, 50%) var(--py, 50%),
+      rgb(255 255 255 / 0.35),
+      transparent 45%
+    ),
+    var(--holo);
+  background-size: 100% 100%, 300% 300%;
+  background-position: 0 0, var(--px, 50%) var(--py, 50%);
+  mix-blend-mode: color-dodge;
+  opacity: 0.16;
+  transition: opacity var(--t-med);
+}
+
+.tcg-card[data-foil="true"]:hover::after {
+  opacity: 0.42;
+}
+
+.rarity-glow {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--glow) 70%, transparent),
+    0 0 28px 2px color-mix(in oklab, var(--glow) 55%, transparent),
+    0 0 90px 10px color-mix(in oklab, var(--glow) 25%, transparent);
+}
+
+/* ─────────────────────────────── Pack opening ─────────────────────────────── */
+@keyframes shake {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0);
+  }
+  20% {
+    transform: translate(-3px, 1px) rotate(-1.2deg);
+  }
+  40% {
+    transform: translate(3px, -1px) rotate(1deg);
+  }
+  60% {
+    transform: translate(-2px, 0) rotate(-0.6deg);
+  }
+  80% {
+    transform: translate(2px, 1px) rotate(0.6deg);
+  }
+}
+
+@keyframes tear-off {
+  to {
+    transform: translate(140px, -220px) rotate(28deg);
+    opacity: 0;
+  }
+}
+
+@keyframes pack-drop {
+  to {
+    transform: translateY(120%) rotate(-4deg);
+    opacity: 0;
+  }
+}
+
+@keyframes card-rise {
+  from {
+    transform: translateY(60%) scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes flash {
+  0% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes signal-in {
+  0% {
+    clip-path: inset(0 0 100% 0);
+    filter: brightness(3);
+  }
+  60% {
+    clip-path: inset(0 0 0 0);
+    filter: brightness(1.6);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    filter: none;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-up {
+  animation: fade-up var(--t-slow) var(--ease-out) both;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgb(236 230 214 / 0.04), rgb(236 230 214 / 0.1), rgb(236 230 214 / 0.04));
+  background-size: 200% 100%;
+  animation: holo-pan 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+  .crt-flicker {
+    display: none;
+  }
+}

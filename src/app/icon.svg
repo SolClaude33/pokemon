@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#050506"/>
+  <defs>
+    <clipPath id="crt">
+      <path d="M6 5.5h20c2.2 0 3.6 1.2 3.9 3.4.4 3.4.4 10.8 0 14.2-.3 2.2-1.7 3.4-3.9 3.4H6c-2.2 0-3.6-1.2-3.9-3.4-.4-3.4-.4-10.8 0-14.2C2.4 6.7 3.8 5.5 6 5.5Z"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#crt)">
+    <rect width="32" height="32" fill="#0b0d11"/>
+    <g transform="skewX(-14) translate(5 0)">
+      <rect x="0" width="4.45" height="32" fill="#ece6d6"/>
+      <rect x="4.4" width="4.45" height="32" fill="#f9f871"/>
+      <rect x="8.8" width="4.45" height="32" fill="#6dffb3"/>
+      <rect x="13.2" width="4.45" height="32" fill="#5ec8ff"/>
+      <rect x="17.6" width="4.45" height="32" fill="#ff6fd8"/>
+      <rect x="22" width="4.45" height="32" fill="#ff5f6d"/>
+      <rect x="26.4" width="4.45" height="32" fill="#a78bfa"/>
+    </g>
+    <rect y="21" width="32" height="8" fill="#0b0d11" opacity="0.88"/>
+    <rect x="4" y="23" width="9" height="2" fill="#ece6d6"/>
+    <rect x="15" y="23" width="3" height="2" fill="#ff4433"/>
+  </g>
+  <path d="M6 5.5h20c2.2 0 3.6 1.2 3.9 3.4.4 3.4.4 10.8 0 14.2-.3 2.2-1.7 3.4-3.9 3.4H6c-2.2 0-3.6-1.2-3.9-3.4-.4-3.4-.4-10.8 0-14.2C2.4 6.7 3.8 5.5 6 5.5Z" fill="none" stroke="#ece6d6" stroke-width="1.2"/>
+</svg>
