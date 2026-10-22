@@ -129,6 +129,7 @@ export function PackStation({ pack, cards, setName, packImage, ev }: Props) {
             key={pulls[0]?.uid}
             owner={owner}
             demo={owner === DEMO_OWNER}
+            minor={pack.minorRarities}
             pulls={pulls}
             packImage={packImage}
             setName={setName}

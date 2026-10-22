@@ -26,9 +26,22 @@ const SETS = [
   // exclude: cards never found in boosters (Machamp holo only came in starter decks)
   // basic energy has no rarity symbol but fills the common slots of 1999 boosters
   { id: "base1", tcgplayerPackId: 138130, exclude: ["8"], name: "Base Set", energyAsCommon: true },
+  // 2021 Evolving Skies — Moonbreon. Rarities split into the subrarities TCGplayer measured.
+  { id: "swsh7", tcgplayerPackId: 244337, relabel: evolvingSkiesRarity },
 ];
 
 const API = "https://api.pokemontcg.io/v2";
+
+// Evolving Skies: the API calls every full art "Rare Ultra" and every VMAX secret
+// "Rare Rainbow"; the alternate arts are the second card of each pair.
+const ES_ALT_V = new Set(["167", "175", "180", "182", "184", "186", "189", "192", "194", "196", "198"]);
+const ES_ALT_VMAX = new Set(["205", "209", "212", "215", "218", "220"]);
+function evolvingSkiesRarity(c) {
+  if (c.rarity === "Rare Ultra") return ES_ALT_V.has(c.number) ? "Alt Art V" : "Full Art";
+  if (c.rarity === "Rare Rainbow") return ES_ALT_VMAX.has(c.number) ? "Alt Art VMAX" : "Rare Rainbow";
+  if (c.rarity === "Rare Secret") return "Gold Rare";
+  return c.rarity;
+}
 
 // The API returns a few new rarities as raw enum keys.
 const RARITY_NAMES = { MEGA_ATTACK_RARE: "Mega Attack Rare" };
@@ -144,6 +157,7 @@ for (const s of SETS) {
 
   const out = cards
     .map((c) => (!c.rarity && s.energyAsCommon && c.supertype === "Energy" ? { ...c, rarity: "Common" } : c))
+    .map((c) => (s.relabel ? { ...c, rarity: s.relabel(c) } : c))
     .filter((c) => c.rarity && !s.exclude?.includes(c.number))
     .map((c) => {
       const { price, reversePrice, updatedAt } = prices(c.tcgplayer);
@@ -175,9 +189,11 @@ for (const s of SETS) {
   if (!SKIP_IMAGES) {
     let done = 0;
     await pool(out, 6, async (c) => {
+      const out = path.join(ROOT, "public", c.img);
+      if (await exists(out)) return; // already optimized; originals may have been cleaned up
       const src = path.join(ROOT, "assets-src/cards", s.id, `${c.number}.png`);
       await download(c._src, src);
-      await toWebp(src, path.join(ROOT, "public", c.img), 440);
+      await toWebp(src, out, 440);
       if (++done % 25 === 0) console.log(`  images ${done}/${out.length}`);
     });
 

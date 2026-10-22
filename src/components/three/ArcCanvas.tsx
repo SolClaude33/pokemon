@@ -23,10 +23,11 @@ const FOV = 32;
 function fitCamera(camera: THREE.Camera, width: number, height: number, lift: number) {
   const aspect = width / height;
   const tan = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
-  const byHeight = (PACK_H * 1.06) / 0.5;
+  // short screens give the caption more room
+  const byHeight = (PACK_H * 1.06) / (height < 720 ? 0.38 : 0.5);
   const byWidth = (PACK_H * 0.548 * 1.06) / (0.56 * aspect);
   const z = Math.max(byHeight, byWidth) / (2 * tan);
-  camera.position.set(0, -2 * z * tan * lift, z);
+  camera.position.set(0, -2 * z * tan * (height < 720 ? lift + 0.09 : lift), z);
 }
 
 function FitCamera({ lift }: { lift: number }) {

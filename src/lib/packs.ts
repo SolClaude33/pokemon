@@ -40,6 +40,8 @@ export type PackConfig = {
   contents: string;
   /** what counts as a hit for the headline "chance of a hit" */
   hitLabel: string;
+  /** rarities that are flagged as hits elsewhere but too common/cheap to celebrate in this pack */
+  minorRarities?: string[];
   slots: Slot[];
   sources: { label: string; url: string }[];
 };
@@ -72,8 +74,46 @@ export const PACKS: PackConfig[] = [
     sources: [{ label: "Bulbapedia — Base Set (TCG)", url: "https://bulbapedia.bulbagarden.net/wiki/Base_Set_(TCG)" }],
   },
   {
-    setId: "me2pt5",
+    setId: "swsh7",
     channel: 2,
+    // TCGplayer market for a sealed booster was ~43 USD (Oct 2026); placeholder price
+    price: 45,
+    tagline: "2021's legend. Eeveelutions in alt art, Rayquaza — and Moonbreon, about one pack in two thousand.",
+    accent: "#5b6cff",
+    contents: "10 cards: 5 Common · 3 Uncommon · 1 reverse holo · 1 Rare or better (plus a basic Energy). Every hit lands in the rare slot.",
+    hitLabel: "Pokémon V or better",
+    minorRarities: ["Rare Holo"],
+    slots: [
+      { label: "Common", count: 5, fill: "Common" },
+      { label: "Uncommon", count: 3, fill: "Uncommon" },
+      { label: "Reverse holo", count: 1, fill: REVERSE_KEY },
+      {
+        label: "Rare slot",
+        count: 1,
+        fill: "Rare",
+        // TCGplayer, 8,000+ packs; the holo/non-holo split of the plain rare is an estimate
+        odds: {
+          "Rare Holo": 0.25,
+          "Rare Holo V": 0.1056,
+          "Rare Holo VMAX": 0.056,
+          "Full Art": 0.0278,
+          "Alt Art V": 0.011,
+          "Rare Rainbow": 0.0084,
+          "Gold Rare": 0.0091,
+          "Alt Art VMAX": 0.003,
+        },
+      },
+    ],
+    sources: [
+      {
+        label: "TCGplayer — 8,000-pack study",
+        url: "https://www.tcgplayer.com/content/article/Pok%C3%A9mon-TCG-Evolving-Skies-Pull-Rates/6a743d7b-e5ee-4fd6-9d18-64a636990e8c/",
+      },
+    ],
+  },
+  {
+    setId: "me2pt5",
+    channel: 3,
     price: 12.5,
     tagline: "Every hero, one rip. The set with the god-pack rumours.",
     accent: "#f2b84b",
@@ -92,7 +132,7 @@ export const PACKS: PackConfig[] = [
   },
   {
     setId: "me2",
-    channel: 3,
+    channel: 4,
     price: 12.5,
     tagline: "Mega Charizard X burns blue. Chase the gold.",
     accent: "#5ec8ff",
@@ -109,7 +149,7 @@ export const PACKS: PackConfig[] = [
   },
   {
     setId: "me1",
-    channel: 4,
+    channel: 5,
     price: 10,
     tagline: "Mega Evolution returns. Lucario and Gardevoir in gold.",
     accent: "#b38cff",
@@ -126,7 +166,7 @@ export const PACKS: PackConfig[] = [
   },
   {
     setId: "sv8pt5",
-    channel: 5,
+    channel: 6,
     price: 15,
     tagline: "Eevee and all eight evolutions. The SIR rate everyone talks about.",
     accent: "#ff8ad8",
@@ -143,7 +183,7 @@ export const PACKS: PackConfig[] = [
   },
   {
     setId: "sv3pt5",
-    channel: 6,
+    channel: 7,
     price: 29,
     tagline: "The original 151. Charizard, Mew, and Venusaur in illustration.",
     accent: "#ff5f6d",

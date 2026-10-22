@@ -49,10 +49,10 @@ export function useAudioPrefs() {
 // ─────────────────────────────── graph ───────────────────────────────
 
 const BGM_URL = "/assets/audio/bgm.mp3";
-/** bgm.mp3 is normalized to about -20 LUFS; at 0.55 it plays near -25 LUFS, ~10 dB under the source */
-const MUSIC_LEVEL = 0.55;
+/** bgm.mp3 is normalized to about -20 LUFS; at 0.35 it plays near -29 LUFS, ~14 dB under the source */
+const MUSIC_LEVEL = 0.35;
 /** music level while a pack is being opened, so the effects stand out */
-const DUCKED = 0.2;
+const DUCKED = 0.13;
 const SFX_LEVEL = 0.24;
 let ducked = false;
 

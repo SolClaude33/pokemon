@@ -57,7 +57,7 @@ function PackContent({ id }: { id: string }) {
   const odds = rarityOdds(pack, pool);
   const ev = expectedValue(pack, pool);
   const chase = chaseCards(cards, 6);
-  const hitChance = 1 - odds.filter((o) => rarityMeta(o.rarity).hit && o.rarity !== "Reverse Holo").reduce((a, o) => a * (1 - o.perPack), 1);
+  const hitChance = 1 - odds.filter((o) => rarityMeta(o.rarity).hit && o.rarity !== "Reverse Holo" && !pack.minorRarities?.includes(o.rarity)).reduce((a, o) => a * (1 - o.perPack), 1);
   const updated = new Date(catalogGeneratedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   return (

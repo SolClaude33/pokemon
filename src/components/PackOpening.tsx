@@ -16,6 +16,8 @@ type Props = {
   owner: string;
   /** free rip without a wallet */
   demo?: boolean;
+  /** rarities not celebrated as hits in this pack */
+  minor?: string[];
   pulls: Pull[];
   packImage: string;
   setName: string;
@@ -24,17 +26,17 @@ type Props = {
   onAgain: () => void;
 };
 
-const isHit = (p: Pull) => !p.reverse && rarityMeta(p.rarity).hit;
+const isHit = (p: Pull, minor: string[] = []) => !p.reverse && rarityMeta(p.rarity).hit && !minor.includes(p.rarity);
 
-/** fanfare size: 1 double rare / holo / IR, 2 ultra, 3 SIR, 4 gold */
+/** fanfare size: 1 double rare / holo / V / IR, 2 ultra / full art, 3 SIR / alt art / rainbow / gold, 4 top chase */
 function hitTier(rarity: string) {
-  if (/Hyper/.test(rarity)) return 4;
-  if (rarity === "Special Illustration Rare") return 3;
-  if (rarity === "Ultra Rare" || rarity === "Mega Attack Rare") return 2;
+  if (/Hyper|Alt Art VMAX/.test(rarity)) return 4;
+  if (/Special Illustration|Alt Art V|Rainbow|Gold/.test(rarity)) return 3;
+  if (/Ultra Rare|Mega Attack|Full Art|VMAX/.test(rarity)) return 2;
   return 1;
 }
 
-export function PackOpening({ owner, demo = false, pulls, packImage, setName, price, onClose, onAgain }: Props) {
+export function PackOpening({ owner, demo = false, minor, pulls, packImage, setName, price, onClose, onAgain }: Props) {
   const [phase, setPhase] = useState<Phase>("sealed");
   const [shown, setShown] = useState(0); // number of cards revealed
   const [suspense, setSuspense] = useState(false);
@@ -61,7 +63,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
       return;
     }
     const upcoming = pulls[shown];
-    if (isHit(upcoming)) {
+    if (isHit(upcoming, minor)) {
       setSuspense(true);
       sfx.suspense(900);
       setTimeout(() => {
@@ -73,7 +75,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
       sfx.flip();
       setShown((s) => s + 1);
     }
-  }, [phase, suspense, shown, pulls]);
+  }, [phase, suspense, shown, pulls, minor]);
 
   useEffect(() => {
     dialogRef.current?.focus();
@@ -185,7 +187,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
       )}
 
       {/* hit flash */}
-      {phase === "reveal" && current && isHit(current) && (
+      {phase === "reveal" && current && isHit(current, minor) && (
         <span
           key={`flash-${current.uid}`}
           aria-hidden="true"
@@ -220,7 +222,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
                   className="relative block"
                   style={{ animation: "signal-in 520ms var(--ease-out) both" }}
                 >
-                  <TcgCard img={current.card.img} name={current.card.name} rarity={current.rarity} reverse={current.reverse} glow={isHit(current)} sizes="300px" eager />
+                  <TcgCard img={current.card.img} name={current.card.name} rarity={current.rarity} reverse={current.reverse} glow={isHit(current, minor)} sizes="300px" eager />
                 </span>
               ) : (
                 <span className="relative block" style={{ animation: "card-rise 700ms var(--ease-out) both" }}>
@@ -243,7 +245,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
             <div className="min-h-[3.5rem] text-center" aria-live="polite">
               {current && !suspense && (
                 <div key={current.uid} className="fade-up">
-                  {isHit(current) ? (
+                  {isHit(current, minor) ? (
                     <p className="gb-dialog mb-3 max-w-[34ch]" data-more="true">
                       Wow! You pulled {current.card.name.toUpperCase()}!
                     </p>
@@ -352,7 +354,7 @@ export function PackOpening({ owner, demo = false, pulls, packImage, setName, pr
                   <label className="group block cursor-pointer">
                     <input type="checkbox" className="peer sr-only" checked={on} onChange={() => toggle(p.uid)} />
                     <span className={`block transition-[opacity,transform] duration-300 ${on ? "scale-[0.96] opacity-60" : ""} peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:outline-dashed peer-focus-visible:outline-offset-4`}>
-                      <TcgCard img={p.card.img} name={p.card.name} rarity={p.rarity} reverse={p.reverse} glow={isHit(p)} sizes="(max-width: 640px) 45vw, 200px" />
+                      <TcgCard img={p.card.img} name={p.card.name} rarity={p.rarity} reverse={p.reverse} glow={isHit(p, minor)} sizes="(max-width: 640px) 45vw, 200px" />
                     </span>
                     <span className="mt-2 block">
                       <span className="block truncate text-[13px]">{p.card.name}</span>

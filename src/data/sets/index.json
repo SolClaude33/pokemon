@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-22T18:36:47.597Z",
+  "generatedAt": "2026-10-22T19:05:32.851Z",
   "sets": [
     {
       "id": "me2pt5",
@@ -134,6 +134,32 @@
         "Rare",
         "Uncommon",
         "Common"
+      ]
+    },
+    {
+      "id": "swsh7",
+      "name": "Evolving Skies",
+      "series": "Sword & Shield",
+      "releaseDate": "2021/08/27",
+      "printedTotal": 203,
+      "total": 237,
+      "cardCount": 237,
+      "logo": "/assets/sets/swsh7-logo.webp",
+      "packImage": "/assets/packs/swsh7.webp",
+      "packMarketPrice": 42.63,
+      "tcgplayerPackId": 244337,
+      "rarities": [
+        "Rare",
+        "Common",
+        "Uncommon",
+        "Rare Holo",
+        "Rare Holo V",
+        "Rare Holo VMAX",
+        "Full Art",
+        "Alt Art V",
+        "Rare Rainbow",
+        "Alt Art VMAX",
+        "Gold Rare"
       ]
     }
   ]

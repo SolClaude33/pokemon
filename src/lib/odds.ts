@@ -39,7 +39,7 @@ export type Pull = {
   slot: string;
 };
 
-const REVERSE_BASE = new Set(["Common", "Uncommon", "Rare"]);
+const REVERSE_BASE = new Set(["Common", "Uncommon", "Rare", "Rare Holo"]);
 
 export type Pool = Map<string, Card[]>;
 
