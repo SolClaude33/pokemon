@@ -23,7 +23,7 @@ PokéCast (folder still named `holovision`; repo SolClaude33/pokemon): real-mone
 ## Commands
 - App: `npm run dev` (preview "holovision", port 3311), `npm run build`, `npm run lint`, `npx tsc --noEmit`.
 - Mock token: after changes `cd contracts && npx hardhat compile && node scripts/export-abi.mjs`.
-- Local chain: `cd contracts && npx hardhat node`, then `npx hardhat run scripts/deploy-local.ts --network localhost` (writes addresses to `.env.local`), restart dev, `node scripts/e2e-local.mjs` (32 end-to-end checks).
+- Local chain: `cd contracts && npx hardhat node`, then `npx hardhat run scripts/deploy-local.ts --network localhost` (writes addresses to `.env.local`), restart dev, `node scripts/e2e-local.mjs` (33 end-to-end checks).
 - Catalog: `node scripts/build-catalog.mjs [--skip-images]`.
 
 ## Design tokens (keep)

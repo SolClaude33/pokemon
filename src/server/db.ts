@@ -53,6 +53,9 @@ create table if not exists orders (
   created_at timestamptz not null default now()
 );
 create index if not exists orders_address on orders(address);
+-- one order per paid pack slot, so concurrent confirmations can't open a pack twice
+alter table orders add column if not exists checkout_slot integer;
+create unique index if not exists orders_checkout_slot on orders(checkout_id, checkout_slot);
 
 create table if not exists items (
   id text primary key,

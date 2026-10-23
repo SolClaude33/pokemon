@@ -512,6 +512,14 @@ body {
   will-change: transform;
 }
 
+/* below lg the CA chip sits under the logo */
+@media (min-width: 641px) and (max-width: 1023px) {
+  .arc-item {
+    --pack-h: clamp(220px, 40vh, 380px);
+    top: clamp(136px, 17vh, 156px);
+  }
+}
+
 @media (max-width: 640px) {
   .arc-item {
     --pack-h: min(48vh, 108vw);

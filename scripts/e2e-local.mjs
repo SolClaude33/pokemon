@@ -200,5 +200,14 @@ const sync = await admin.call("/api/cron/sync");
 const after = (await alice.call("/api/vault")).items.length;
 ok(sync.fulfilled >= 1 && after === before + 10, "sync fulfils a paid checkout that was never confirmed");
 
+// 10. the same payment confirmed from two tabs at once opens its packs once
+const race = await alice.call("/api/checkout/pack", { setId: "me1", quantity: 2 });
+const raceTx = await alice.transfer(race);
+const spentBefore = (await alice.call("/api/profile")).spent;
+await Promise.allSettled([alice.confirm(race, raceTx), alice.confirm(race, raceTx), alice.confirm(race, raceTx)]);
+const raced = (await alice.call("/api/vault")).items.length;
+const spentAfter = (await alice.call("/api/profile")).spent;
+ok(raced === after + 20 && Math.abs(spentAfter - spentBefore - race.amount) < 1e-9, "concurrent confirmations open 2 packs and count the spend once");
+
 console.log(failures ? `\n${failures} check(s) failed` : "\nAll checks passed");
 process.exit(failures ? 1 : 0);

@@ -3,6 +3,7 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useEffect, useRef } from "react";
 import * as THREE from "three";
+import { TOKEN_CA } from "@/lib/site";
 import { Pack3D, StudioLights, type PackSpec } from "./Pack3D";
 
 type Props = {
@@ -27,7 +28,9 @@ function fitCamera(camera: THREE.Camera, width: number, height: number, lift: nu
   const byHeight = (PACK_H * 1.06) / (height < 720 ? 0.38 : 0.5);
   const byWidth = (PACK_H * 0.548 * 1.06) / (0.56 * aspect);
   const z = Math.max(byHeight, byWidth) / (2 * tan);
-  camera.position.set(0, -2 * z * tan * (height < 720 ? lift + 0.09 : lift), z);
+  // below lg the CA chip sits under the logo: frame the pack a little lower to clear it
+  const chip = TOKEN_CA && width < 1024 ? 0.035 : 0;
+  camera.position.set(0, -2 * z * tan * ((height < 720 ? lift + 0.09 : lift) - chip), z);
 }
 
 function FitCamera({ lift }: { lift: number }) {

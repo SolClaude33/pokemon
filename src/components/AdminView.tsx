@@ -127,8 +127,10 @@ export function AdminView() {
             {busy === "prices" ? "Refreshing…" : "Refresh prices now"}
           </button>
           <button type="button" className="btn" disabled={!!busy || !c?.treasury} onClick={() => run("sync", async () => {
-            const r = await api<{ fulfilled: number }>("/api/cron/sync");
-            return `Treasury scanned: ${r.fulfilled} payment(s) fulfilled`;
+            const r = await api<{ fulfilled: number; scanned: number; failedChunks: number }>("/api/cron/sync");
+            if (r.failedChunks)
+              throw new Error(`Treasury scan incomplete: the RPC rejected ${r.failedChunks} log request(s) — set BSC_RPC_URL_SERVER to a provider that supports eth_getLogs. ${r.fulfilled} fulfilled.`);
+            return `Treasury scanned (${r.scanned} transfers): ${r.fulfilled} payment(s) fulfilled`;
           })}>
             {busy === "sync" ? "Syncing…" : "Sync recent payments"}
           </button>

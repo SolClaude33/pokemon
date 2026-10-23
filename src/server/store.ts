@@ -16,6 +16,7 @@ const MAX_PACKS_PER_CHECKOUT = 10;
 const CHECKOUT_MINUTES = 15;
 const LISTING_HOLD_MINUTES = 10;
 const round2 = (n: number) => Math.round(n * 100) / 100;
+const isUniqueViolation = (e: unknown) => (e as { code?: string })?.code === "23505";
 
 // ─────────────────────────────── users ───────────────────────────────
 
@@ -80,7 +81,11 @@ export type ItemRow = {
 };
 
 /** Opens one pack with the user's provably fair seeds and puts the cards in their vault. */
-async function openPack(address: Address, setId: string, opts: { checkoutId?: string; voucherId?: number; price: number; cashback: number }) {
+async function openPack(
+  address: Address,
+  setId: string,
+  opts: { checkoutId?: string; slot?: number; voucherId?: number; price: number; cashback: number },
+) {
   const book = await livePriceBook();
   const data = await getPack(setId, book);
   const pack = packBySetId(setId);
@@ -93,11 +98,15 @@ async function openPack(address: Address, setId: string, opts: { checkoutId?: st
   ))!;
   const pulls = drawPack(data.listing, buildPool(data.cards), fairRng(u.server_seed, u.client_seed, u.nonce));
 
-  const [order] = await q<{ id: number }>(
-    `insert into orders (address, set_id, checkout_id, voucher_id, price, cashback, server_seed_hash, client_seed, nonce)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`,
-    [address, setId, opts.checkoutId ?? null, opts.voucherId ?? null, opts.price, opts.cashback, u.server_seed_hash, u.client_seed, u.nonce],
-  );
+  const order = await one<{ id: number }>(
+    `insert into orders (address, set_id, checkout_id, checkout_slot, voucher_id, price, cashback, server_seed_hash, client_seed, nonce)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id`,
+    [address, setId, opts.checkoutId ?? null, opts.slot ?? null, opts.voucherId ?? null, opts.price, opts.cashback, u.server_seed_hash, u.client_seed, u.nonce],
+  ).catch((e) => {
+    if (isUniqueViolation(e)) return null; // a concurrent confirmation already opened this slot
+    throw e;
+  });
+  if (!order) return null;
   const minor = new Set(pack.minorRarities ?? []);
   const rows = pulls.map((p) => ({
     id: crypto.randomUUID(),
@@ -144,7 +153,7 @@ async function openPack(address: Address, setId: string, opts: { checkoutId?: st
   };
 }
 
-export type OpenedPack = Awaited<ReturnType<typeof openPack>>;
+export type OpenedPack = NonNullable<Awaited<ReturnType<typeof openPack>>>;
 
 /** Opens a checkout the user pays with a plain USDT transfer to the treasury. */
 async function createCheckout(
@@ -184,7 +193,7 @@ export async function openVoucher(address: Address, voucherId: number) {
     [voucherId, address],
   );
   if (!v) throw new HttpError(404, "That free pack was already used");
-  const opened = await openPack(address, v.set_id, { voucherId: v.id, price: 0, cashback: 0 });
+  const opened = (await openPack(address, v.set_id, { voucherId: v.id, price: 0, cashback: 0 }))!;
   await q("update vouchers set used_order_id = $2 where id = $1", [v.id, opened.orderId]);
   return opened;
 }
@@ -203,7 +212,7 @@ type CheckoutRow = {
   status: string;
   tx_hash: string | null;
   created_at: Date;
-  meta: { unitPrice?: number; itemIds?: string[]; shipmentId?: string; listingId?: string };
+  meta: { unitPrice?: number; rate?: number; itemIds?: string[]; shipmentId?: string; listingId?: string };
 };
 
 /** Money that arrived for something no longer available goes back through the payout queue. */
@@ -218,22 +227,27 @@ async function fulfil(checkoutId: string) {
   const address = getAddress(c.address);
 
   if (c.kind === "pack") {
-    const done = await q<{ id: number }>("select id from orders where checkout_id = $1", [c.id]);
+    // spend and cashback are credited exactly once; the rate is kept for the per-pack records
+    const level = levelFor(num((await user(address)).total_spent)).current.cashback;
+    const credit = await one(
+      `update checkouts set meta = meta || jsonb_build_object('rate', $2::numeric) where id = $1 and meta->>'rate' is null returning id`,
+      [c.id, level],
+    );
+    if (credit) {
+      const cashback = round2(num(c.amount) * level);
+      await q(
+        `update users set total_spent = total_spent + $2, cashback_balance = cashback_balance + $3, cashback_earned = cashback_earned + $3 where address = $1`,
+        [address, num(c.amount), cashback],
+      );
+    }
+    const rate = Number((await one<{ rate: string }>("select meta->>'rate' as rate from checkouts where id = $1", [c.id]))!.rate);
+    const unit = c.meta.unitPrice ?? num(c.amount) / c.quantity;
+    const done = new Set((await q<{ checkout_slot: number }>("select checkout_slot from orders where checkout_id = $1", [c.id])).map((o) => o.checkout_slot));
     const opened: OpenedPack[] = [];
-    if (done.length < c.quantity) {
-      const u = await user(address);
-      const before = num(u.total_spent);
-      const rate = levelFor(before).current.cashback;
-      const unit = c.meta.unitPrice ?? num(c.amount) / c.quantity;
-      if (done.length === 0) {
-        const cashback = round2(num(c.amount) * rate);
-        await q(
-          `update users set total_spent = total_spent + $2, cashback_balance = cashback_balance + $3, cashback_earned = cashback_earned + $3 where address = $1`,
-          [address, num(c.amount), cashback],
-        );
-      }
-      for (let i = done.length; i < c.quantity; i++)
-        opened.push(await openPack(address, c.ref, { checkoutId: c.id, price: unit, cashback: round2(unit * rate) }));
+    for (let slot = 0; slot < c.quantity; slot++) {
+      if (done.has(slot)) continue;
+      const pack = await openPack(address, c.ref, { checkoutId: c.id, slot, price: unit, cashback: round2(unit * rate) });
+      if (pack) opened.push(pack);
     }
     await q(`update checkouts set status = 'fulfilled' where id = $1`, [c.id]);
     return { kind: "pack" as const, opened, checkoutId: c.id };
@@ -291,8 +305,6 @@ async function fulfil(checkoutId: string) {
   return { kind: "unknown" as const };
 }
 
-const isUniqueViolation = (e: unknown) => (e as { code?: string })?.code === "23505";
-
 /** Marks a checkout paid by `txHash` (pending → paid once; a transaction pays one checkout only). */
 async function markPaid(checkoutId: string, txHash: Hash) {
   try {
@@ -324,12 +336,12 @@ export async function confirmPayment(address: Address, checkoutId: string, txHas
  * Catches payments whose browser tab closed before confirming (cron): matches recent
  * treasury transfers to pending checkouts of the same wallet and exact amount.
  */
-export async function reconcile(transfers: TreasuryTransfer[]) {
+export async function reconcile({ transfers, failedChunks }: { transfers: TreasuryTransfer[]; failedChunks: number }) {
   let fulfilled = 0;
   for (const t of transfers) {
     if (await one("select id from checkouts where tx_hash = $1", [t.txHash.toLowerCase()])) continue;
     const pending = await q<CheckoutRow>(
-      `select * from checkouts where address = $1 and status = 'pending' and created_at <= $2::timestamptz + interval '5 minutes' order by created_at`,
+      `select * from checkouts where address = $1 and status = 'pending' and created_at <= $2::timestamptz + interval '5 minutes' order by created_at desc`,
       [t.from, t.minedAt],
     );
     const c = pending.find((p) => toUnits(num(p.amount)) === t.value);
@@ -338,12 +350,12 @@ export async function reconcile(transfers: TreasuryTransfer[]) {
       fulfilled++;
     }
   }
-  // paid but interrupted before fulfilment
-  for (const c of await q<{ id: string }>("select id from checkouts where status = 'paid'")) {
+  // paid but interrupted before fulfilment (left alone while a confirmation may still be running)
+  for (const c of await q<{ id: string }>("select id from checkouts where status = 'paid' and paid_at < now() - interval '5 minutes'")) {
     await fulfil(c.id);
     fulfilled++;
   }
-  return { scanned: transfers.length, fulfilled };
+  return { scanned: transfers.length, failedChunks, fulfilled };
 }
 
 // ─────────────────────────────── vault ───────────────────────────────

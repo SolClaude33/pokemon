@@ -18,7 +18,7 @@ Without `DATABASE_URL` the app uses an embedded Postgres (PGlite) in `.data/`.
 cd contracts && npm install && npx hardhat node                          # terminal 1
 cd contracts && npx hardhat run scripts/deploy-local.ts --network localhost  # deploys MockUSDT, writes .env.local
 npm run dev                                                              # restart after the deploy
-node scripts/e2e-local.mjs                                               # 32 end-to-end checks
+node scripts/e2e-local.mjs                                               # 33 end-to-end checks
 ```
 
 ## How payments work

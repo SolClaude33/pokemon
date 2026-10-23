@@ -111,7 +111,7 @@ export function TvShell({ children }: { children: ReactNode }) {
               <Link href="/" className="pointer-events-auto" aria-label="PokéCast home">
                 <Logo />
               </Link>
-              <ContractAddress className="inline-flex md:hidden" />
+              <ContractAddress className="inline-flex lg:hidden" />
             </div>
             <nav aria-label="Main" className="hud pointer-events-auto flex items-center justify-end gap-5">
               {NAV_RIGHT.map((n) => (
@@ -131,7 +131,7 @@ export function TvShell({ children }: { children: ReactNode }) {
 
           {/* bottom HUD */}
           <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-[clamp(16px,3.4vw,40px)] pb-[clamp(14px,3.2vh,34px)]">
-            <ContractAddress className="absolute bottom-[clamp(10px,calc(3.2vh-4px),30px)] left-1/2 hidden -translate-x-1/2 md:inline-flex" />
+            <ContractAddress className="absolute bottom-[clamp(10px,calc(3.2vh-4px),30px)] left-1/2 hidden -translate-x-1/2 lg:inline-flex" />
             <div className="hud pointer-events-auto flex items-center gap-3 text-dim sm:gap-5">
               <span className="hidden tabular-nums sm:inline" suppressHydrationWarning>
                 {clock}

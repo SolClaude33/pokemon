@@ -34,7 +34,7 @@ const friendly = (e: unknown) => {
 
 // Sent-but-unconfirmed payments survive a closed tab and are retried on the next visit.
 const PENDING_KEY = "pc:pending-payments";
-type Pending = { checkoutId: string; txHash: Hex; address: Address };
+type Pending = { checkoutId: string; txHash: Hex; address: Address; at: number };
 
 function readPending(): Pending[] {
   try {
@@ -71,6 +71,8 @@ export function useResumePayments(signedIn: Address | null | undefined) {
     if (!signedIn) return;
     for (const p of readPending()) {
       if (getAddress(p.address) !== getAddress(signedIn)) continue;
+      // fresh entries belong to a payment another tab may still be confirming
+      if (Date.now() - (p.at ?? 0) < 2 * 60_000) continue;
       api("/api/checkout/confirm", { checkoutId: p.checkoutId, txHash: p.txHash })
         .then(() => dropPending(p.checkoutId))
         .catch((e: unknown) => {
@@ -115,7 +117,7 @@ export function usePayment() {
         args: [to, amount],
         chainId: chain.id,
       });
-      writePending([...readPending(), { checkoutId, txHash: hash, address }]);
+      writePending([...readPending(), { checkoutId, txHash: hash, address, at: Date.now() }]);
       setTxHash(hash);
       setStep("confirm");
       await waitForTransactionReceipt(config, { hash, chainId: chain.id });

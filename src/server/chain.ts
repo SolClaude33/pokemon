@@ -52,24 +52,26 @@ export type TreasuryTransfer = { txHash: Hash; from: Address; value: bigint; min
  * USDT transfers into the treasury over the last `blocks` blocks, for the reconciliation
  * cron. Scanned in chunks because public BSC RPCs cap eth_getLogs ranges.
  */
-export async function recentTreasuryTransfers(blocks = 20_000n, chunk = 2_000n): Promise<TreasuryTransfer[]> {
+export async function recentTreasuryTransfers(blocks = 20_000n, chunk = 2_000n) {
   const to = treasury();
   const latest = await publicClient.getBlockNumber();
-  const out: TreasuryTransfer[] = [];
+  const transfers: TreasuryTransfer[] = [];
+  let failedChunks = 0;
   for (let end = latest; end > latest - blocks && end > 0n; end -= chunk) {
     const start = end > chunk ? end - chunk + 1n : 0n;
     const logs = await publicClient
       .getContractEvents({ address: USDT_ADDRESS, abi: erc20Abi, eventName: "Transfer", args: { to }, fromBlock: start, toBlock: end })
       .catch((e) => {
         console.error("treasury scan failed", start, end, e instanceof Error ? e.message : e);
+        failedChunks++;
         return [];
       });
     for (const l of logs) {
       const block = await publicClient.getBlock({ blockNumber: l.blockNumber });
-      out.push({ txHash: l.transactionHash, from: getAddress(l.args.from!), value: l.args.value!, minedAt: new Date(Number(block.timestamp) * 1000) });
+      transfers.push({ txHash: l.transactionHash, from: getAddress(l.args.from!), value: l.args.value!, minedAt: new Date(Number(block.timestamp) * 1000) });
     }
   }
-  return out;
+  return { transfers, failedChunks };
 }
 
 /** Checks that an admin payout tx moved at least `amount` USDT to `to`. */
