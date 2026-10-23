@@ -8,10 +8,10 @@ import { sfx } from "@/lib/audio";
 import { explorerTx } from "@/lib/chain/config";
 import { fmtUSDT } from "@/lib/odds";
 import { ECONOMICS, buybackFor } from "@/lib/packs";
-import { STEP_LABEL, usePayment, type SignedPayment } from "@/lib/pay";
+import { STEP_LABEL, usePayment, type Checkout } from "@/lib/pay";
 import { rarityRank } from "@/lib/rarity";
 import { api, useMe } from "@/lib/session";
-import type { ApiItem, VaultData } from "@/lib/types";
+import { PAYOUT_LABEL, type ApiItem, type VaultData } from "@/lib/types";
 import { RarityTag, TcgCard } from "./TcgCard";
 import { shortAddr } from "./WalletButton";
 
@@ -112,7 +112,7 @@ export function VaultView({ setNames }: { setNames: Record<string, string> }) {
     }
     setNotice(null);
     try {
-      await pay.run(() => api<SignedPayment>("/api/vault/ship", { itemIds: [...selected], to }));
+      await pay.run(() => api<Checkout>("/api/vault/ship", { itemIds: [...selected], to }));
       sfx.coin();
       setSelected(new Set());
       setShipOpen(false);
@@ -317,7 +317,7 @@ export function VaultView({ setNames }: { setNames: Record<string, string> }) {
               {payouts.length === 0 && <li className="hud py-3 text-faint">No payouts yet.</li>}
               {payouts.map((p) => (
                 <li key={p.id} className="hud flex items-center justify-between gap-4 border-b border-line py-3">
-                  <span className="text-dim">{p.kind === "buyback" ? "Buyback" : "Cashback"}</span>
+                  <span className="text-dim">{PAYOUT_LABEL[p.kind] ?? p.kind}</span>
                   <span>{Number(p.amount).toFixed(2)} USDT</span>
                   {p.status === "paid" && p.tx_hash ? (
                     <a className="link-hud text-ok" href={explorerTx(p.tx_hash)} target="_blank" rel="noreferrer">

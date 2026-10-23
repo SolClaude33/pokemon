@@ -10,13 +10,12 @@ import { createSiweMessage } from "viem/siwe";
 const BASE = process.argv[2] ?? "http://localhost:3311";
 const env = Object.fromEntries(
   readFileSync(new URL("../.env.local", import.meta.url), "utf8")
-    .split("\n")
+    .split(/\r?\n/)
     .filter((l) => l && !l.startsWith("#"))
     .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]),
 );
 const USDT = env.NEXT_PUBLIC_USDT_ADDRESS;
-const PAYMENTS = env.NEXT_PUBLIC_PAYMENTS_ADDRESS;
-const abi = JSON.parse(readFileSync(new URL("../contracts/artifacts/contracts/PokeCastPayments.sol/PokeCastPayments.json", import.meta.url), "utf8")).abi;
+const TREASURY = env.NEXT_PUBLIC_TREASURY_ADDRESS;
 
 // Hardhat default accounts #0 (admin), #1 (buyer/seller), #2 (second trainer)
 const KEYS = {
@@ -31,6 +30,7 @@ const ok = (cond, msg) => {
   console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`);
   if (!cond) failures++;
 };
+const fails = (p) => p.then(() => null).catch((e) => e);
 
 function trainer(name) {
   const account = privateKeyToAccount(KEYS[name]);
@@ -68,22 +68,17 @@ function trainer(name) {
     });
     await call("/api/auth/verify", { message, signature: await account.signMessage({ message }) });
   }
-  async function pay({ payment, signature }) {
-    const amount = BigInt(payment.amount);
-    const approve = await wallet.writeContract({ address: USDT, abi: erc20Abi, functionName: "approve", args: [PAYMENTS, amount] });
-    await pub.waitForTransactionReceipt({ hash: approve });
-    const hash = await wallet.writeContract({
-      address: PAYMENTS,
-      abi,
-      functionName: "pay",
-      args: [{ ...payment, amount, fee: BigInt(payment.fee), deadline: BigInt(payment.deadline) }, signature],
-    });
+  /** Sends USDT for a checkout (optionally tampered with) and returns the tx hash. */
+  async function transfer(checkout, { to = checkout.to, amount = BigInt(checkout.amountWei) } = {}) {
+    const hash = await wallet.writeContract({ address: USDT, abi: erc20Abi, functionName: "transfer", args: [to, amount] });
     await pub.waitForTransactionReceipt({ hash });
-    return call("/api/checkout/confirm", { txHash: hash });
+    return hash;
   }
+  const confirm = (checkout, txHash) => call("/api/checkout/confirm", { checkoutId: checkout.checkoutId, txHash });
+  const pay = async (checkout) => confirm(checkout, await transfer(checkout));
   const balance = async (addr = account.address) =>
     Number(formatUnits(await pub.readContract({ address: USDT, abi: erc20Abi, functionName: "balanceOf", args: [addr] }), 18));
-  return { account, wallet, call, signIn, pay, balance };
+  return { account, wallet, call, signIn, transfer, confirm, pay, balance };
 }
 
 const alice = trainer("alice");
@@ -92,51 +87,66 @@ const admin = trainer("admin");
 
 // 1. sign in
 await alice.signIn();
+await bob.signIn();
 const me = await alice.call("/api/auth/me");
 ok(me.address === alice.account.address, "SIWE sign-in opens a session");
 
-// 2. buy 2 Mega Evolution packs on-chain
-const treasury = env.NEXT_PUBLIC_TREASURY_ADDRESS;
-const t0 = await alice.balance(treasury);
+// 2. buy 2 Mega Evolution packs with a plain USDT transfer to the treasury
+const t0 = await alice.balance(TREASURY);
 const checkout = await alice.call("/api/checkout/pack", { setId: "me1", quantity: 2 });
-ok(checkout.amount > 0 && checkout.payment.quantity === 2, `checkout signed: 2 packs for ${checkout.amount} USDT`);
-const confirmed = await alice.pay(checkout);
+ok(checkout.to === TREASURY && BigInt(checkout.amountWei) === parseUnits(checkout.amount.toFixed(6), 18), `checkout: send ${checkout.amount} USDT to the treasury`);
+const packTx = await alice.transfer(checkout);
+const confirmed = await alice.confirm(checkout, packTx);
 const opened = confirmed.results[0].opened;
-ok(opened.length === 2 && opened.every((p) => p.pulls.length === 10), "payment confirmed → 2 packs opened, 10 cards each");
-ok(Math.abs((await alice.balance(treasury)) - t0 - checkout.amount) < 1e-9, "treasury received the USDT");
+ok(opened.length === 2 && opened.every((p) => p.pulls.length === 10), "transfer verified → 2 packs opened, 10 cards each");
+ok(Math.abs((await alice.balance(TREASURY)) - t0 - checkout.amount) < 1e-9, "treasury received the USDT");
+const again = await alice.confirm(checkout, packTx);
+ok(again.results[0].opened.length === 0, "confirming twice doesn't open more packs");
 
-// replaying the confirmation must not open more packs
-const again = await alice.call("/api/checkout/confirm", { txHash: (await pub.getBlock()).transactions[0] }).catch((e) => e);
+// the guarantees the payment contract used to give, now enforced by the server
+const second = await alice.call("/api/checkout/pack", { setId: "me1", quantity: 2 });
+ok((await fails(alice.confirm(second, packTx)))?.message.includes("409"), "a transaction can't pay two checkouts");
+const bobCheckout = await bob.call("/api/checkout/pack", { setId: "me1", quantity: 2 });
+ok((await fails(bob.confirm(bobCheckout, packTx))) instanceof Error, "someone else's transfer can't pay your checkout");
+const short = await alice.call("/api/checkout/pack", { setId: "me1", quantity: 1 });
+const shortTx = await alice.transfer(short, { amount: BigInt(short.amountWei) / 2n });
+ok((await fails(alice.confirm(short, shortTx))) instanceof Error, "underpaying is rejected");
+const elsewhere = await alice.call("/api/checkout/pack", { setId: "me1", quantity: 1 });
+const elsewhereTx = await alice.transfer(elsewhere, { to: bob.account.address });
+ok((await fails(alice.confirm(elsewhere, elsewhereTx))) instanceof Error, "a transfer to another wallet is rejected");
+
 const vault1 = await alice.call("/api/vault");
-ok(vault1.items.length === 20, `vault holds 20 cards (no duplicate fulfilment)${again instanceof Error ? "" : ""}`);
+ok(vault1.items.length === 20, "vault holds 20 cards (no duplicate fulfilment)");
 
 // 3. buyback one card
 const cheapest = [...vault1.items].sort((a, b) => a.value_at_pull - b.value_at_pull)[0];
 const bb = await alice.call("/api/vault/buyback", { itemIds: [cheapest.id] });
 ok(bb.count === 1 && bb.total > 0, `buyback queued: ${bb.total} USDT`);
 
-// 4. list the most valuable card, bob buys it
-const best = [...vault1.items].filter((i) => i.status === "vault").sort((a, b) => b.value_at_pull - a.value_at_pull)[0];
+// 4. list the most valuable card, bob buys it through the treasury
+const byValue = [...vault1.items].filter((i) => i.status === "vault").sort((a, b) => b.value_at_pull - a.value_at_pull);
+const best = byValue[0];
 const { listingId } = await alice.call("/api/market/list", { itemId: best.id, price: 20 });
 ok(!!listingId, `listed ${best.name} for 20 USDT`);
-await bob.signIn();
-const aliceBefore = await alice.balance();
 const lc = await bob.call("/api/market/checkout", { listingId });
-ok(Number(formatUnits(BigInt(lc.payment.fee), 18)) === 0.5, "market checkout signed with a 2.5% fee");
+const lc2 = await bob.call("/api/market/checkout", { listingId }); // same buyer, second tab
+ok(lc.to === TREASURY && lc.fee === 0.5, "market checkout pays the treasury, 2.5% fee");
 await bob.pay(lc);
-ok(Math.abs((await alice.balance()) - aliceBefore - 19.5) < 1e-9, "seller received 19.5 USDT on-chain");
 const bobVault = await bob.call("/api/vault");
 ok(bobVault.items.some((i) => i.id === best.id && i.source === "market"), "card moved to the buyer's vault");
-const relist = await bob.call("/api/market/checkout", { listingId }).catch((e) => e);
-ok(relist instanceof Error, "sold listing can't be bought twice");
+const sale = (await alice.call("/api/vault")).payouts.find((p) => p.kind === "sale");
+ok(sale && Number(sale.amount) === 19.5 && sale.status === "pending", "seller payout of 19.5 USDT queued");
+ok((await fails(bob.call("/api/market/checkout", { listingId }))) instanceof Error, "sold listing can't be bought twice");
+await bob.pay(lc2);
+const refund = (await bob.call("/api/vault")).payouts.find((p) => p.kind === "refund");
+ok(refund && Number(refund.amount) === 20, "paying for an already-sold listing queues a full refund");
 
 // 5. missions: first rip → free pack, then open it
 const missions = (await alice.call("/api/missions")).missions;
 const first = missions.find((m) => m.id === "first-rip");
 ok(first.progress === 1 && !first.claimed, "mission 'first broadcast' completed");
 await alice.call("/api/missions/claim", { missionId: "first-rip" });
-const dup = await alice.call("/api/missions/claim", { missionId: "first-rip" }).catch((e) => e);
-ok(dup instanceof Error, "mission reward can't be claimed twice");
+ok((await fails(alice.call("/api/missions/claim", { missionId: "first-rip" }))) instanceof Error, "mission reward can't be claimed twice");
 const vouchers = (await alice.call("/api/vault")).vouchers;
 ok(vouchers.length === 1 && vouchers[0].set_id === "me1", "free Mega Evolution pack credited");
 const free = await alice.call("/api/packs/free", { voucherId: vouchers[0].id });
@@ -160,12 +170,13 @@ const profile = await alice.call("/api/profile");
 ok(profile.packs.paid === 2 && profile.packs.free === 1, "profile counts paid + free packs");
 ok(profile.spent === checkout.amount && profile.cashback.balance === 1, "profile tracks spend and mission cashback");
 
-// 8. admin pays the buyback and ships the order
+// 8. admin pays the seller and ships the order
 await admin.signIn();
 const overview = await admin.call("/api/admin/overview");
-const payout = overview.payouts.find((p) => p.address === alice.account.address && p.kind === "buyback");
-ok(!!payout, "buyback appears in the admin payout queue");
-const fake = await admin.call("/api/admin/payout", { id: payout.id, status: "paid", txHash: (await pub.getBlock()).transactions[0] }).catch((e) => e);
+ok(overview.config.treasury === TREASURY && !("payments" in overview.config), "admin config shows the treasury, no contract");
+const payout = overview.payouts.find((p) => p.address === alice.account.address && p.kind === "sale");
+ok(!!payout, "seller payout appears in the admin queue");
+const fake = await fails(admin.call("/api/admin/payout", { id: payout.id, status: "paid", txHash: packTx }));
 ok(fake instanceof Error, "admin can't mark a payout paid with an unrelated tx");
 const tx = await admin.wallet.writeContract({
   address: USDT,
@@ -177,10 +188,17 @@ await pub.waitForTransactionReceipt({ hash: tx });
 await admin.call("/api/admin/payout", { id: payout.id, status: "paid", txHash: tx });
 await admin.call("/api/admin/shipment", { id: shipped.id, tracking: "PC123456789" });
 const finalVault = await alice.call("/api/vault");
-ok(finalVault.payouts.some((p) => p.status === "paid"), "buyback payout marked paid after on-chain check");
+ok(finalVault.payouts.some((p) => p.kind === "sale" && p.status === "paid"), "seller payout marked paid after on-chain check");
 ok(finalVault.shipments[0].status === "shipped", "shipment marked shipped with tracking");
-const notAdmin = await alice.call("/api/admin/overview").catch((e) => e);
-ok(notAdmin instanceof Error, "non-admins are locked out of /api/admin");
+ok((await fails(alice.call("/api/admin/overview"))) instanceof Error, "non-admins are locked out of /api/admin");
+
+// 9. tab closed after paying: the sync cron matches the transfer to the checkout
+const orphan = await alice.call("/api/checkout/pack", { setId: "me1", quantity: 1 });
+await alice.transfer(orphan);
+const before = (await alice.call("/api/vault")).items.length;
+const sync = await admin.call("/api/cron/sync");
+const after = (await alice.call("/api/vault")).items.length;
+ok(sync.fulfilled >= 1 && after === before + 10, "sync fulfils a paid checkout that was never confirmed");
 
 console.log(failures ? `\n${failures} check(s) failed` : "\nAll checks passed");
 process.exit(failures ? 1 : 0);

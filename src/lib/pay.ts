@@ -1,40 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { erc20Abi, type Address, type Hex } from "viem";
+import { useEffect, useState } from "react";
+import { erc20Abi, getAddress, isAddress, zeroAddress, type Address, type Hex } from "viem";
 import { useAccount, useConfig } from "wagmi";
-import { readContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
-import { paymentsAbi } from "./chain/artifacts";
-import { PAYMENTS_ADDRESS, USDT_ADDRESS, chain } from "./chain/config";
+import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { TREASURY_ADDRESS, USDT_ADDRESS, chain } from "./chain/config";
 import { api } from "./session";
 
-/** Signed checkout as returned by the PokéCast API. */
-export type SignedPayment = {
-  payment: {
-    id: Hex;
-    payer: Address;
-    kind: number;
-    ref: Hex;
-    quantity: number;
-    amount: string;
-    payee: Address;
-    fee: string;
-    deadline: string;
-  };
-  signature: Hex;
-};
+/** Checkout as returned by the PokéCast API: send exactly `amountWei` USDT to `to`. */
+export type Checkout = { checkoutId: string; to: Address; amount: number; amountWei: string };
 
-export type PayStep = "idle" | "checkout" | "approve" | "pay" | "confirm" | "done" | "error";
+export type PayStep = "idle" | "checkout" | "pay" | "confirm" | "done" | "error";
 
 export const STEP_LABEL: Record<PayStep, string> = {
   idle: "",
   checkout: "Preparing checkout…",
-  approve: "Approve USDT in your wallet…",
-  pay: "Confirm the payment in your wallet…",
+  pay: "Confirm the USDT transfer in your wallet…",
   confirm: "Waiting for BNB Chain…",
   done: "Payment confirmed",
   error: "",
 };
+
+/** Payments are live once the treasury wallet is configured. */
+export const paymentsLive = !!USDT_ADDRESS && !!TREASURY_ADDRESS;
 
 const friendly = (e: unknown) => {
   const m = e instanceof Error ? e.message : String(e);
@@ -44,10 +32,59 @@ const friendly = (e: unknown) => {
   return m.split("\n")[0].slice(0, 180);
 };
 
+// Sent-but-unconfirmed payments survive a closed tab and are retried on the next visit.
+const PENDING_KEY = "pc:pending-payments";
+type Pending = { checkoutId: string; txHash: Hex; address: Address };
+
+function readPending(): Pending[] {
+  try {
+    return JSON.parse(localStorage.getItem(PENDING_KEY) ?? "[]") as Pending[];
+  } catch {
+    return [];
+  }
+}
+function writePending(list: Pending[]) {
+  try {
+    if (list.length) localStorage.setItem(PENDING_KEY, JSON.stringify(list));
+    else localStorage.removeItem(PENDING_KEY);
+  } catch {}
+}
+const dropPending = (checkoutId: string) => writePending(readPending().filter((p) => p.checkoutId !== checkoutId));
+
+async function confirm<T>(checkoutId: string, txHash: Hex) {
+  // the node behind the API can lag a block or two behind the wallet's
+  for (let i = 0; ; i++) {
+    try {
+      const result = await api<T>("/api/checkout/confirm", { checkoutId, txHash });
+      dropPending(checkoutId);
+      return result;
+    } catch (e) {
+      if (i === 5) throw e;
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+}
+
+/** Retries confirmations left over from a closed tab, once the wallet is signed in. */
+export function useResumePayments(signedIn: Address | null | undefined) {
+  useEffect(() => {
+    if (!signedIn) return;
+    for (const p of readPending()) {
+      if (getAddress(p.address) !== getAddress(signedIn)) continue;
+      api("/api/checkout/confirm", { checkoutId: p.checkoutId, txHash: p.txHash })
+        .then(() => dropPending(p.checkoutId))
+        .catch((e: unknown) => {
+          // keep it for later unless the server says it can never succeed
+          if (/already used|another transaction|not found$|Invalid/i.test(e instanceof Error ? e.message : "")) dropPending(p.checkoutId);
+        });
+    }
+  }, [signedIn]);
+}
+
 /**
- * Runs a checkout end to end: asks the API for a signed payment, approves USDT if
- * the allowance is short, calls PokeCastPayments.pay and lets the server confirm
- * the transaction. Returns the server's confirmation results.
+ * Runs a checkout end to end: asks the API for a checkout, sends that exact USDT
+ * amount to the treasury from the wallet and lets the server verify the transfer.
+ * Returns the server's confirmation results.
  */
 export function usePayment() {
   const config = useConfig();
@@ -56,67 +93,35 @@ export function usePayment() {
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<Hex | null>(null);
 
-  async function run<T>(checkout: () => Promise<SignedPayment>) {
+  async function run<T>(checkout: () => Promise<Checkout>) {
     setError(null);
     setTxHash(null);
     try {
       if (!address) throw new Error("Connect your wallet first.");
-      if (!PAYMENTS_ADDRESS || !USDT_ADDRESS) throw new Error("Payments aren't live yet.");
+      if (!paymentsLive) throw new Error("Payments aren't live yet.");
       setStep("checkout");
-      const { payment, signature } = await checkout();
-      const amount = BigInt(payment.amount);
-
-      const allowance = await readContract(config, {
-        address: USDT_ADDRESS,
-        abi: erc20Abi,
-        functionName: "allowance",
-        args: [address, PAYMENTS_ADDRESS],
-        chainId: chain.id,
-      });
-      if (allowance < amount) {
-        setStep("approve");
-        const approval = await writeContract(config, {
-          address: USDT_ADDRESS,
-          abi: erc20Abi,
-          functionName: "approve",
-          args: [PAYMENTS_ADDRESS, amount],
-          chainId: chain.id,
-        });
-        await waitForTransactionReceipt(config, { hash: approval, chainId: chain.id });
-      }
+      const { checkoutId, to, amountWei } = await checkout();
+      // never send funds anywhere but the configured treasury
+      if (!isAddress(to) || to === zeroAddress || getAddress(to) !== getAddress(TREASURY_ADDRESS))
+        throw new Error("Payment address mismatch — reload the page and try again.");
+      const amount = BigInt(amountWei);
+      if (amount <= 0n) throw new Error("Invalid amount.");
 
       setStep("pay");
       const hash = await writeContract(config, {
-        address: PAYMENTS_ADDRESS,
-        abi: paymentsAbi,
-        functionName: "pay",
-        args: [
-          {
-            ...payment,
-            amount,
-            fee: BigInt(payment.fee),
-            deadline: BigInt(payment.deadline),
-          },
-          signature,
-        ],
+        address: USDT_ADDRESS,
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [to, amount],
         chainId: chain.id,
       });
+      writePending([...readPending(), { checkoutId, txHash: hash, address }]);
       setTxHash(hash);
       setStep("confirm");
       await waitForTransactionReceipt(config, { hash, chainId: chain.id });
-
-      // the node behind the API can lag a block or two behind the wallet's
-      let result: T | null = null;
-      for (let i = 0; i < 6 && !result; i++) {
-        try {
-          result = await api<T>("/api/checkout/confirm", { txHash: hash });
-        } catch (e) {
-          if (i === 5) throw e;
-          await new Promise((r) => setTimeout(r, 2000));
-        }
-      }
+      const result = await confirm<T>(checkoutId, hash);
       setStep("done");
-      return result!;
+      return result;
     } catch (e) {
       setStep("error");
       setError(friendly(e));

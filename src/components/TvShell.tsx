@@ -3,8 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import type { Address } from "viem";
 import { initAudioOnGesture, setAudioPrefs, useAudioPrefs } from "@/lib/audio";
+import { useResumePayments } from "@/lib/pay";
+import { useMe } from "@/lib/session";
 import { Logo } from "./Logo";
+import { ContractAddress, XLink } from "./SiteLinks";
 import { WalletButton } from "./WalletButton";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -70,6 +74,8 @@ export function TvShell({ children }: { children: ReactNode }) {
   const { clock, timer } = useClock();
   const crt = useCrt();
   const audio = useAudioPrefs();
+  const me = useMe();
+  useResumePayments(me.data?.address as Address | null | undefined);
 
   useEffect(() => initAudioOnGesture(), []);
 
@@ -101,9 +107,12 @@ export function TvShell({ children }: { children: ReactNode }) {
                 {timer}
               </span>
             </div>
-            <Link href="/" className="pointer-events-auto" aria-label="PokéCast home">
-              <Logo />
-            </Link>
+            <div className="flex flex-col items-start gap-2 sm:items-center">
+              <Link href="/" className="pointer-events-auto" aria-label="PokéCast home">
+                <Logo />
+              </Link>
+              <ContractAddress className="inline-flex md:hidden" />
+            </div>
             <nav aria-label="Main" className="hud pointer-events-auto flex items-center justify-end gap-5">
               {NAV_RIGHT.map((n) => (
                 <Link
@@ -115,12 +124,14 @@ export function TvShell({ children }: { children: ReactNode }) {
                   {n.label}
                 </Link>
               ))}
+              <XLink />
               <WalletButton />
             </nav>
           </header>
 
           {/* bottom HUD */}
           <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-[clamp(16px,3.4vw,40px)] pb-[clamp(14px,3.2vh,34px)]">
+            <ContractAddress className="absolute bottom-[clamp(10px,calc(3.2vh-4px),30px)] left-1/2 hidden -translate-x-1/2 md:inline-flex" />
             <div className="hud pointer-events-auto flex items-center gap-3 text-dim sm:gap-5">
               <span className="hidden tabular-nums sm:inline" suppressHydrationWarning>
                 {clock}

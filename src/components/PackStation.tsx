@@ -7,10 +7,10 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useAccount } from "wagmi";
 import { sfx } from "@/lib/audio";
-import { PAYMENTS_ADDRESS, chain, explorerTx } from "@/lib/chain/config";
+import { chain, explorerTx } from "@/lib/chain/config";
 import { fmtUSDT } from "@/lib/odds";
 import { ECONOMICS, packSize, type PackConfig } from "@/lib/packs";
-import { STEP_LABEL, usePayment, type SignedPayment } from "@/lib/pay";
+import { STEP_LABEL, paymentsLive, usePayment, type Checkout } from "@/lib/pay";
 import { api, useMe } from "@/lib/session";
 import type { ConfirmResult, OpenedPack, VaultData } from "@/lib/types";
 import { useMounted } from "@/lib/useClient";
@@ -43,7 +43,7 @@ export function PackStation({ pack, setName, packImage, ev }: Props) {
   const wrongChain = isConnected && chainId !== chain.id;
   const total = Math.round(pack.price * quantity * 100) / 100;
   const lowBalance = usdt.value != null && usdt.value < total;
-  const live = !!PAYMENTS_ADDRESS;
+  const live = paymentsLive;
 
   const vault = useQuery<VaultData>({
     queryKey: ["vault"],
@@ -55,7 +55,7 @@ export function PackStation({ pack, setName, packImage, ev }: Props) {
   const buy = async () => {
     try {
       const res = await pay.run<{ results: ConfirmResult[] }>(() =>
-        api<SignedPayment>("/api/checkout/pack", { setId: pack.setId, quantity }),
+        api<Checkout>("/api/checkout/pack", { setId: pack.setId, quantity }),
       );
       const opened = res.results.flatMap((r) => (r.kind === "pack" ? r.opened : []));
       sfx.coin();
@@ -118,7 +118,7 @@ export function PackStation({ pack, setName, packImage, ev }: Props) {
         {!mounted ? (
           <span className="btn skeleton w-full" aria-hidden="true" />
         ) : !live ? (
-          <p className="gb-dialog">Pack sales open soon. The payment contract isn&apos;t live on BNB Chain yet.</p>
+          <p className="gb-dialog">Pack sales open soon. Payments on BNB Chain aren&apos;t live yet.</p>
         ) : !isConnected || !signedIn ? (
           <button type="button" className="btn btn-primary w-full" onClick={() => openConnectModal?.()}>
             {isConnected ? "Sign in with your wallet" : "Connect wallet to buy"}

@@ -1,21 +1,6 @@
 import "server-only";
-import {
-  createPublicClient,
-  decodeEventLog,
-  erc20Abi,
-  formatUnits,
-  getAddress,
-  http,
-  parseUnits,
-  stringToHex,
-  hexToString,
-  type Address,
-  type Hash,
-  type Hex,
-} from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { paymentsAbi } from "@/lib/chain/artifacts";
-import { PAYMENTS_ADDRESS, RPC_URL, USDT_ADDRESS, USDT_DECIMALS, chain } from "@/lib/chain/config";
+import { createPublicClient, decodeEventLog, erc20Abi, formatUnits, getAddress, http, parseUnits, type Address, type Hash } from "viem";
+import { RPC_URL, TREASURY_ADDRESS, USDT_ADDRESS, USDT_DECIMALS, chain } from "@/lib/chain/config";
 import { HttpError } from "./session";
 
 export const publicClient = createPublicClient({ chain, transport: http(process.env.BSC_RPC_URL_SERVER || RPC_URL) });
@@ -23,134 +8,74 @@ export const publicClient = createPublicClient({ chain, transport: http(process.
 export const toUnits = (usdt: number) => parseUnits(usdt.toFixed(6), USDT_DECIMALS);
 export const fromUnits = (v: bigint) => Number(formatUnits(v, USDT_DECIMALS));
 
-/** short strings (set ids, listing ids) packed into the contract's bytes32 `ref` */
-export const toRef = (s: string) => stringToHex(s, { size: 32 });
-export const fromRef = (h: Hex) => hexToString(h, { size: 32 });
-
-export const newPaymentId = (): Hex => `0x${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex")}`;
-
-function signer() {
-  const key = process.env.SIGNER_PRIVATE_KEY as Hex | undefined;
-  if (!key) throw new HttpError(503, "Payments are not configured yet (SIGNER_PRIVATE_KEY)");
-  return privateKeyToAccount(key);
+/** The treasury every payment goes to; checkouts are refused until it is configured. */
+export function treasury(): Address {
+  if (!USDT_ADDRESS || !TREASURY_ADDRESS) throw new HttpError(503, "Payments aren't live yet (NEXT_PUBLIC_TREASURY_ADDRESS)");
+  return TREASURY_ADDRESS;
 }
 
-export const signerAddress = () => {
-  try {
-    return signer().address;
-  } catch {
-    return null;
-  }
-};
-
-export function assertPaymentsReady() {
-  if (!PAYMENTS_ADDRESS || !USDT_ADDRESS) throw new HttpError(503, "Payments contract is not deployed yet");
-}
-
-export type Payment = {
-  id: Hex;
-  payer: Address;
-  kind: number;
-  ref: Hex;
-  quantity: number;
-  amount: bigint;
-  payee: Address;
-  fee: bigint;
-  deadline: bigint;
-};
-
-const PAYMENT_TYPES = {
-  Payment: [
-    { name: "id", type: "bytes32" },
-    { name: "payer", type: "address" },
-    { name: "kind", type: "uint8" },
-    { name: "ref", type: "bytes32" },
-    { name: "quantity", type: "uint32" },
-    { name: "amount", type: "uint256" },
-    { name: "payee", type: "address" },
-    { name: "fee", type: "uint256" },
-    { name: "deadline", type: "uint64" },
-  ],
-} as const;
-
-/** EIP-712 signature the PokeCastPayments contract accepts for this checkout. */
-export async function signPayment(p: Payment) {
-  assertPaymentsReady();
-  return signer().signTypedData({
-    domain: { name: "PokeCast", version: "1", chainId: chain.id, verifyingContract: PAYMENTS_ADDRESS },
-    types: PAYMENT_TYPES,
-    primaryType: "Payment",
-    message: p,
-  });
-}
-
-/** JSON-safe form of a payment for the browser (bigints as strings). */
-export const serializePayment = (p: Payment) => ({
-  ...p,
-  amount: p.amount.toString(),
-  fee: p.fee.toString(),
-  deadline: p.deadline.toString(),
-});
-
-export type PaidEvent = {
-  id: Hex;
-  payer: Address;
-  kind: number;
-  ref: Hex;
-  quantity: number;
-  amount: bigint;
-  payee: Address;
-  fee: bigint;
-  txHash: Hash;
-};
-
-/** Reads the confirmed `Paid` events of a transaction (only from our contract). */
-export async function paidEventsOf(txHash: Hash): Promise<PaidEvent[]> {
-  assertPaymentsReady();
+/** Sums the USDT `Transfer` logs of a mined transaction going from → to. */
+async function usdtSent(txHash: Hash, from: Address | null, to: Address) {
   const receipt = await publicClient.getTransactionReceipt({ hash: txHash }).catch(() => null);
   if (!receipt) throw new HttpError(404, "Transaction not found yet — try again in a few seconds");
   if (receipt.status !== "success") throw new HttpError(400, "That transaction failed on-chain");
-  const out: PaidEvent[] = [];
-  for (const log of receipt.logs) {
-    if (getAddress(log.address) !== getAddress(PAYMENTS_ADDRESS)) continue;
-    try {
-      const ev = decodeEventLog({ abi: paymentsAbi, data: log.data, topics: log.topics });
-      if (ev.eventName !== "Paid") continue;
-      const a = ev.args as unknown as Omit<PaidEvent, "txHash">;
-      out.push({ ...a, payer: getAddress(a.payer), payee: getAddress(a.payee), txHash });
-    } catch {}
-  }
-  return out;
-}
-
-/** Recent `Paid` events, for the reconciliation cron. */
-export async function recentPaidEvents(blocks = 5000n): Promise<PaidEvent[]> {
-  assertPaymentsReady();
-  const latest = await publicClient.getBlockNumber();
-  const logs = await publicClient.getContractEvents({
-    address: PAYMENTS_ADDRESS,
-    abi: paymentsAbi,
-    eventName: "Paid",
-    fromBlock: latest > blocks ? latest - blocks : 0n,
-    toBlock: latest,
-  });
-  return logs.map((l) => {
-    const a = l.args as unknown as Omit<PaidEvent, "txHash">;
-    return { ...a, payer: getAddress(a.payer), payee: getAddress(a.payee), txHash: l.transactionHash };
-  });
-}
-
-/** Checks that an admin payout tx moved at least `amount` USDT to `to`. */
-export async function verifyUsdtTransfer(txHash: Hash, to: Address, amount: number) {
-  const receipt = await publicClient.getTransactionReceipt({ hash: txHash }).catch(() => null);
-  if (!receipt || receipt.status !== "success") throw new HttpError(400, "Payout transaction not found or failed");
   let sent = 0n;
   for (const log of receipt.logs) {
     if (getAddress(log.address) !== getAddress(USDT_ADDRESS)) continue;
     try {
       const ev = decodeEventLog({ abi: erc20Abi, data: log.data, topics: log.topics });
-      if (ev.eventName === "Transfer" && getAddress(ev.args.to) === getAddress(to)) sent += ev.args.value;
+      if (ev.eventName !== "Transfer" || getAddress(ev.args.to) !== getAddress(to)) continue;
+      if (from && getAddress(ev.args.from) !== getAddress(from)) continue;
+      sent += ev.args.value;
     } catch {}
   }
+  return { sent, blockNumber: receipt.blockNumber };
+}
+
+/**
+ * Checks that `txHash` moved at least `amount` USDT from the payer to the treasury
+ * in a block mined after the checkout was created (so old transfers can't be reused).
+ */
+export async function verifyPayment(txHash: Hash, payer: Address, amount: number, notBefore: Date) {
+  const { sent, blockNumber } = await usdtSent(txHash, payer, treasury());
+  if (sent < toUnits(amount))
+    throw new HttpError(400, `That transaction sent ${fromUnits(sent)} USDT from your wallet to the treasury, expected ${amount}`);
+  const block = await publicClient.getBlock({ blockNumber });
+  // a few minutes of slack for clock drift between the database and the chain
+  if (Number(block.timestamp) * 1000 < notBefore.getTime() - 5 * 60_000)
+    throw new HttpError(400, "That transaction is older than this checkout");
+}
+
+export type TreasuryTransfer = { txHash: Hash; from: Address; value: bigint; minedAt: Date };
+
+/**
+ * USDT transfers into the treasury over the last `blocks` blocks, for the reconciliation
+ * cron. Scanned in chunks because public BSC RPCs cap eth_getLogs ranges.
+ */
+export async function recentTreasuryTransfers(blocks = 20_000n, chunk = 2_000n): Promise<TreasuryTransfer[]> {
+  const to = treasury();
+  const latest = await publicClient.getBlockNumber();
+  const out: TreasuryTransfer[] = [];
+  for (let end = latest; end > latest - blocks && end > 0n; end -= chunk) {
+    const start = end > chunk ? end - chunk + 1n : 0n;
+    const logs = await publicClient
+      .getContractEvents({ address: USDT_ADDRESS, abi: erc20Abi, eventName: "Transfer", args: { to }, fromBlock: start, toBlock: end })
+      .catch((e) => {
+        console.error("treasury scan failed", start, end, e instanceof Error ? e.message : e);
+        return [];
+      });
+    for (const l of logs) {
+      const block = await publicClient.getBlock({ blockNumber: l.blockNumber });
+      out.push({ txHash: l.transactionHash, from: getAddress(l.args.from!), value: l.args.value!, minedAt: new Date(Number(block.timestamp) * 1000) });
+    }
+  }
+  return out;
+}
+
+/** Checks that an admin payout tx moved at least `amount` USDT to `to`. */
+export async function verifyUsdtTransfer(txHash: Hash, to: Address, amount: number) {
+  const { sent } = await usdtSent(txHash, null, to).catch(() => {
+    throw new HttpError(400, "Payout transaction not found or failed");
+  });
   if (sent < toUnits(amount)) throw new HttpError(400, `That transaction sent ${fromUnits(sent)} USDT, expected ${amount}`);
 }

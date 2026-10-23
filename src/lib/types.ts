@@ -63,3 +63,11 @@ export type ConfirmResult =
   | { kind: "listing"; listingId: string; itemId: string | null }
   | { kind: "shipping"; shipmentId: string }
   | { kind: "unknown" | "mismatch" };
+
+/** What each payout in the queue is for. */
+export const PAYOUT_LABEL: Record<string, string> = {
+  buyback: "Buyback",
+  cashback: "Cashback",
+  sale: "PokéMart sale",
+  refund: "Refund",
+};

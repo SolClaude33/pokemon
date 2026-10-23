@@ -21,7 +21,7 @@ const STEPS = [
   {
     n: "03",
     title: "Pay in USDT on BNB Chain",
-    body: "Sign in with MetaMask, Binance Wallet, Trust, OKX or any BNB Chain wallet and pay in USDT (BEP-20). Payments go through the PokéCast contract straight to the treasury — it never holds your funds.",
+    body: "Sign in with MetaMask, Binance Wallet, Trust, OKX or any BNB Chain wallet and pay in USDT (BEP-20). Each payment is a single USDT transfer from your wallet to the PokéCast treasury; the server checks it on BNB Chain before anything opens.",
   },
   {
     n: "04",
@@ -41,7 +41,7 @@ const STEPS = [
   {
     n: "07",
     title: "Trade on the PokéMart",
-    body: `List any card from your vault at your own price, or buy the exact card you're chasing from other trainers. Buyers pay sellers directly on BNB Chain; sellers pay a ${pct(ECONOMICS.marketFee)} fee.`,
+    body: `List any card from your vault at your own price, or buy the exact card you're chasing from other trainers. Buyers pay in USDT on BNB Chain and the seller is paid out in USDT, minus a ${pct(ECONOMICS.marketFee)} fee.`,
   },
   {
     n: "08",
@@ -65,7 +65,7 @@ const FAQ = [
   },
   {
     q: "What do I need to buy?",
-    a: "A BNB Chain wallet holding USDT (BEP-20) for the packs and a little BNB for gas. The first purchase asks you to approve USDT for the PokéCast contract.",
+    a: "A BNB Chain wallet holding USDT (BEP-20) for the packs and a little BNB for gas. No token approvals: you just confirm a USDT transfer in your wallet.",
   },
 ];
 

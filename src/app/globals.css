@@ -432,6 +432,20 @@ body {
   content: "■ ";
 }
 
+/* token contract address chip (layered so display utilities can switch it per breakpoint) */
+@layer components {
+  .ca-chip {
+    align-items: center;
+    gap: 0.6em;
+    padding: 3px 8px;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    background: color-mix(in oklab, var(--screen) 78%, transparent);
+    backdrop-filter: blur(4px);
+    white-space: nowrap;
+  }
+}
+
 /* ─────────────────────────────── Pack art ─────────────────────────────── */
 .pack {
   position: relative;
@@ -500,8 +514,8 @@ body {
 
 @media (max-width: 640px) {
   .arc-item {
-    --pack-h: min(50vh, 112vw);
-    top: clamp(84px, 12vh, 110px);
+    --pack-h: min(48vh, 108vw);
+    top: clamp(112px, 14vh, 132px); /* clears the CA chip under the logo */
   }
 }
 

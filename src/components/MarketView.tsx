@@ -6,10 +6,10 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useDeferredValue, useMemo, useState } from "react";
 import { sfx } from "@/lib/audio";
-import { PAYMENTS_ADDRESS, explorerTx } from "@/lib/chain/config";
+import { explorerTx } from "@/lib/chain/config";
 import { fmtUSDT } from "@/lib/odds";
 import { ECONOMICS, buybackFor } from "@/lib/packs";
-import { STEP_LABEL, usePayment, type SignedPayment } from "@/lib/pay";
+import { STEP_LABEL, paymentsLive, usePayment, type Checkout } from "@/lib/pay";
 import { rarityMeta, rarityRank } from "@/lib/rarity";
 import { api, useMe } from "@/lib/session";
 import type { ApiItem, ApiListing, VaultData } from "@/lib/types";
@@ -92,13 +92,13 @@ export function MarketView({ packs, dex }: { packs: { id: string; name: string; 
   const isMine = (l: ApiListing) => !!address && l.seller.toLowerCase() === address.toLowerCase();
   const mine = (market.data?.listings ?? []).filter(isMine);
   const sellable = (vault.data?.items ?? []).filter((i) => i.status === "vault").sort((a, b) => Number(b.value_at_pull) - Number(a.value_at_pull));
-  const live = !!PAYMENTS_ADDRESS;
+  const live = paymentsLive;
 
   const buy = async () => {
     if (!open) return;
     setResult(null);
     try {
-      await pay.run(() => api<SignedPayment>("/api/market/checkout", { listingId: open.id }));
+      await pay.run(() => api<Checkout>("/api/market/checkout", { listingId: open.id }));
       sfx.coin();
       setResult({ tone: "ok", text: `You got ${open.name}! It's in your vault.` });
       qc.invalidateQueries();
@@ -339,7 +339,7 @@ export function MarketView({ packs, dex }: { packs: { id: string; name: string; 
             <Delta price={Number(open.price)} market={marketOf(open.card_id)} />
           </div>
           <p className="hud mt-2 text-faint">
-            Seller {isMine(open) ? "you" : shortAddr(open.seller)} · listed {ago(open.created_at)} · paid straight to the seller on BNB Chain
+            Seller {isMine(open) ? "you" : shortAddr(open.seller)} · listed {ago(open.created_at)} · paid in USDT on BNB Chain
           </p>
           {confirm && !result && (
             <p className="gb-dialog mt-6" data-more="true">
@@ -478,7 +478,7 @@ function SellPanel({
               <dt>Or instant buyback</dt>
               <dd className="text-right text-phosphor">{buybackFor(market).toFixed(2)} USDT</dd>
             </dl>
-            <p className="hud mt-3 text-faint">Buyers pay you directly on BNB Chain; the card moves to their vault.</p>
+            <p className="hud mt-3 text-faint">When it sells, the card moves to the buyer’s vault and your USDT (minus the fee) is sent to your wallet from the payout queue.</p>
             {error && (
               <p role="alert" className="hud mt-3 text-poke-red">
                 {error}

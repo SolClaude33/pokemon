@@ -1,22 +1,12 @@
 import "server-only";
-import { getAddress, zeroAddress, type Address, type Hash, type Hex } from "viem";
+import { getAddress, type Address, type Hash, type Hex } from "viem";
 import { getPack } from "@/lib/catalog";
-import { KIND } from "@/lib/chain/config";
 import { levelFor, MIN_CASHBACK_WITHDRAWAL } from "@/lib/levels";
 import { goalTarget, MISSIONS, periodWindow, type Mission } from "@/lib/missions";
 import { buildPool, drawPack } from "@/lib/odds";
 import { ECONOMICS, buybackFor, packBySetId } from "@/lib/packs";
 import { rarityMeta } from "@/lib/rarity";
-import {
-  newPaymentId,
-  paidEventsOf,
-  serializePayment,
-  signPayment,
-  toRef,
-  toUnits,
-  type PaidEvent,
-  type Payment,
-} from "./chain";
+import { toUnits, treasury, verifyPayment, type TreasuryTransfer } from "./chain";
 import { num, one, q } from "./db";
 import { fairRng, newClientSeed, newServerSeed } from "./fair";
 import { livePriceBook } from "./prices";
@@ -156,7 +146,24 @@ async function openPack(address: Address, setId: string, opts: { checkoutId?: st
 
 export type OpenedPack = Awaited<ReturnType<typeof openPack>>;
 
-/** Prices and signs a pack checkout the user then pays on-chain. */
+/** Opens a checkout the user pays with a plain USDT transfer to the treasury. */
+async function createCheckout(
+  address: Address,
+  c: { kind: "pack" | "listing" | "shipping"; ref: string; quantity: number; amount: number; fee?: number; payee?: string | null; minutes: number; meta: CheckoutRow["meta"] },
+) {
+  const to = treasury();
+  const id = crypto.randomUUID();
+  await q(
+    `insert into checkouts (id, address, kind, ref, quantity, amount, fee, payee, deadline, meta)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, now() + make_interval(mins => $9), $10)`,
+    [id, address, c.kind, c.ref, c.quantity, c.amount, c.fee ?? 0, c.payee ?? null, c.minutes, JSON.stringify(c.meta)],
+  );
+  return { checkoutId: id, to, amount: c.amount, amountWei: toUnits(c.amount).toString() };
+}
+
+export type Checkout = Awaited<ReturnType<typeof createCheckout>>;
+
+/** Prices a pack checkout the user then pays on-chain. */
 export async function checkoutPacks(address: Address, setId: string, quantity: number) {
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_PACKS_PER_CHECKOUT)
     throw new HttpError(400, `Buy between 1 and ${MAX_PACKS_PER_CHECKOUT} packs at a time`);
@@ -166,24 +173,8 @@ export async function checkoutPacks(address: Address, setId: string, quantity: n
   await ensureUser(address);
   const unit = data.listing.price;
   const amount = round2(unit * quantity);
-  const payment: Payment = {
-    id: newPaymentId(),
-    payer: address,
-    kind: KIND.pack,
-    ref: toRef(setId),
-    quantity,
-    amount: toUnits(amount),
-    payee: zeroAddress,
-    fee: 0n,
-    deadline: BigInt(Math.floor(Date.now() / 1000) + CHECKOUT_MINUTES * 60),
-  };
-  const signature = await signPayment(payment);
-  await q(
-    `insert into checkouts (id, address, kind, ref, quantity, amount, fee, payee, deadline, meta)
-     values ($1, $2, 'pack', $3, $4, $5, 0, null, to_timestamp($6), $7)`,
-    [payment.id, address, setId, quantity, amount, Number(payment.deadline), JSON.stringify({ unitPrice: unit })],
-  );
-  return { payment: serializePayment(payment), signature, unitPrice: unit, amount };
+  const checkout = await createCheckout(address, { kind: "pack", ref: setId, quantity, amount, minutes: CHECKOUT_MINUTES, meta: { unitPrice: unit } });
+  return { ...checkout, unitPrice: unit };
 }
 
 /** Opens a free pack earned from a mission. */
@@ -210,19 +201,20 @@ type CheckoutRow = {
   fee: string;
   payee: string | null;
   status: string;
+  tx_hash: string | null;
+  created_at: Date;
   meta: { unitPrice?: number; itemIds?: string[]; shipmentId?: string; listingId?: string };
 };
 
-/** Turns a confirmed on-chain payment into packs, a market transfer or a shipment. Idempotent. */
-async function fulfil(ev: PaidEvent) {
-  const c = await one<CheckoutRow>("select * from checkouts where id = $1", [ev.id.toLowerCase()]);
-  if (!c) return { kind: "unknown" as const };
-  if (getAddress(c.address) !== ev.payer || toUnits(num(c.amount)) !== ev.amount) {
-    console.error("payment does not match checkout", ev.id);
-    return { kind: "mismatch" as const };
-  }
-  // pending → paid exactly once
-  await q(`update checkouts set status = 'paid', tx_hash = $2, paid_at = now() where id = $1 and status = 'pending'`, [c.id, ev.txHash]);
+/** Money that arrived for something no longer available goes back through the payout queue. */
+async function refund(c: CheckoutRow, reason: string) {
+  await q(`insert into payouts (address, kind, amount, note) values ($1, 'refund', $2, $3)`, [getAddress(c.address), num(c.amount), reason]);
+}
+
+/** Turns a paid checkout into packs, a market transfer or a shipment. Idempotent. */
+async function fulfil(checkoutId: string) {
+  const c = await one<CheckoutRow>("select * from checkouts where id = $1", [checkoutId]);
+  if (!c || c.status === "pending") return { kind: "unknown" as const };
   const address = getAddress(c.address);
 
   if (c.kind === "pack") {
@@ -247,55 +239,111 @@ async function fulfil(ev: PaidEvent) {
     return { kind: "pack" as const, opened, checkoutId: c.id };
   }
 
+  // the paid → fulfilled flip makes the side effects below run exactly once
+  const claimed = await one(`update checkouts set status = 'fulfilled' where id = $1 and status = 'paid' returning id`, [c.id]);
+
   if (c.kind === "listing") {
     const listingId = c.meta.listingId ?? c.ref;
+    if (!claimed) {
+      const l = await one<{ item_id: string }>("select item_id from listings where checkout_id = $1", [c.id]);
+      return { kind: "listing" as const, listingId, itemId: l?.item_id ?? null, refunded: !l };
+    }
+    // the buyer's hold may have lapsed while the transaction was mining: still theirs unless someone else took it
     const l = await one<{ id: string; item_id: string; seller: string }>(
-      `update listings set status = 'sold', buyer = $2, sold_at = now(), checkout_id = $3 where id = $1 and status = 'active' returning id, item_id, seller`,
+      `update listings set status = 'sold', buyer = $2, sold_at = now(), checkout_id = $3
+        where id = $1 and status = 'active' and seller <> $2
+          and (reserved_by = $2 or reserved_until is null or reserved_until < now())
+        returning id, item_id, seller`,
       [listingId, address, c.id],
     );
-    if (l) {
-      await q(
-        `update items set address = $2, status = 'vault', source = 'market', acquired_at = now(), sold_for = null where id = $1`,
-        [l.item_id, address],
-      );
+    if (!l) {
+      await refund(c, `Listing ${listingId} was no longer available`);
+      return { kind: "listing" as const, listingId, itemId: null, refunded: true };
     }
-    await q(`update checkouts set status = 'fulfilled' where id = $1`, [c.id]);
-    return { kind: "listing" as const, listingId, itemId: l?.item_id ?? null };
+    await q(`update items set address = $2, status = 'vault', source = 'market', acquired_at = now(), sold_for = null where id = $1`, [
+      l.item_id,
+      address,
+    ]);
+    // the seller is paid from the treasury, minus the PokéMart fee
+    await q(`insert into payouts (address, kind, amount, item_ids, note) values ($1, 'sale', $2, $3, $4)`, [
+      getAddress(l.seller),
+      round2(num(c.amount) - num(c.fee)),
+      [l.item_id],
+      `PokéMart sale ${listingId}`,
+    ]);
+    return { kind: "listing" as const, listingId, itemId: l.item_id, refunded: false };
   }
 
   if (c.kind === "shipping") {
     const shipmentId = c.meta.shipmentId ?? c.ref;
+    if (!claimed) return { kind: "shipping" as const, shipmentId };
     const s = await one<{ item_ids: string[] }>(
       `update shipments set status = 'paid' where id = $1 and status = 'awaiting_payment' returning item_ids`,
       [shipmentId],
     );
-    if (s) await q(`update items set status = 'shipping' where id = any($1) and address = $2 and status = 'vault'`, [s.item_ids, address]);
-    await q(`update checkouts set status = 'fulfilled' where id = $1`, [c.id]);
+    if (!s) {
+      await refund(c, `Shipment ${shipmentId} was no longer awaiting payment`);
+      return { kind: "shipping" as const, shipmentId, refunded: true };
+    }
+    await q(`update items set status = 'shipping' where id = any($1) and address = $2 and status = 'vault'`, [s.item_ids, address]);
     return { kind: "shipping" as const, shipmentId };
   }
   return { kind: "unknown" as const };
 }
 
-/** Called by the browser right after its payment transaction confirms. */
-export async function confirmTx(address: Address, txHash: Hash) {
-  const events = (await paidEventsOf(txHash)).filter((e) => e.payer === address);
-  if (!events.length) throw new HttpError(400, "No PokéCast payment from your wallet in that transaction");
-  const results = [];
-  for (const ev of events) results.push(await fulfil(ev));
-  return results;
+const isUniqueViolation = (e: unknown) => (e as { code?: string })?.code === "23505";
+
+/** Marks a checkout paid by `txHash` (pending → paid once; a transaction pays one checkout only). */
+async function markPaid(checkoutId: string, txHash: Hash) {
+  try {
+    return !!(await one(`update checkouts set status = 'paid', tx_hash = $2, paid_at = now() where id = $1 and status = 'pending' returning id`, [
+      checkoutId,
+      txHash.toLowerCase(),
+    ]));
+  } catch (e) {
+    if (isUniqueViolation(e)) throw new HttpError(409, "That transaction was already used for another payment");
+    throw e;
+  }
 }
 
-/** Catches payments whose browser tab closed before confirming (cron). */
-export async function reconcile(events: PaidEvent[]) {
+/** Called by the browser once its USDT transfer to the treasury has been mined. */
+export async function confirmPayment(address: Address, checkoutId: string, txHash: Hash) {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(txHash ?? "")) throw new HttpError(400, "Invalid transaction hash");
+  const c = await one<CheckoutRow>("select * from checkouts where id = $1 and address = $2", [String(checkoutId), address]);
+  if (!c) throw new HttpError(404, "Checkout not found");
+  if (c.status === "pending") {
+    await verifyPayment(txHash, address, num(c.amount), new Date(c.created_at));
+    await markPaid(c.id, txHash);
+  }
+  const paid = await one<{ tx_hash: string }>("select tx_hash from checkouts where id = $1", [c.id]);
+  if (paid?.tx_hash !== txHash.toLowerCase()) throw new HttpError(409, "This checkout was paid by another transaction");
+  return fulfil(c.id);
+}
+
+/**
+ * Catches payments whose browser tab closed before confirming (cron): matches recent
+ * treasury transfers to pending checkouts of the same wallet and exact amount.
+ */
+export async function reconcile(transfers: TreasuryTransfer[]) {
   let fulfilled = 0;
-  for (const ev of events) {
-    const c = await one<{ status: string }>("select status from checkouts where id = $1", [ev.id.toLowerCase()]);
-    if (c && c.status !== "fulfilled") {
-      await fulfil(ev);
+  for (const t of transfers) {
+    if (await one("select id from checkouts where tx_hash = $1", [t.txHash.toLowerCase()])) continue;
+    const pending = await q<CheckoutRow>(
+      `select * from checkouts where address = $1 and status = 'pending' and created_at <= $2::timestamptz + interval '5 minutes' order by created_at`,
+      [t.from, t.minedAt],
+    );
+    const c = pending.find((p) => toUnits(num(p.amount)) === t.value);
+    if (c && (await markPaid(c.id, t.txHash).catch(() => false))) {
+      await fulfil(c.id);
       fulfilled++;
     }
   }
-  return { fulfilled };
+  // paid but interrupted before fulfilment
+  for (const c of await q<{ id: string }>("select id from checkouts where status = 'paid'")) {
+    await fulfil(c.id);
+    fulfilled++;
+  }
+  return { scanned: transfers.length, fulfilled };
 }
 
 // ─────────────────────────────── vault ───────────────────────────────
@@ -369,24 +417,16 @@ export async function checkoutShipment(address: Address, itemIds: string[], to: 
     [shipmentId, address, items.map((i) => i.id), to.name.trim(), to.line1.trim(), to.city.trim(), to.postal.trim(), to.country.trim()],
   );
   const amount = ECONOMICS.shippingFee;
-  const payment: Payment = {
-    id: newPaymentId(),
-    payer: address,
-    kind: KIND.shipping,
-    ref: toRef(shipmentId),
+  const checkout = await createCheckout(address, {
+    kind: "shipping",
+    ref: shipmentId,
     quantity: items.length,
-    amount: toUnits(amount),
-    payee: zeroAddress,
-    fee: 0n,
-    deadline: BigInt(Math.floor(Date.now() / 1000) + CHECKOUT_MINUTES * 60),
-  };
-  const signature = await signPayment(payment);
-  await q(
-    `insert into checkouts (id, address, kind, ref, quantity, amount, deadline, meta) values ($1, $2, 'shipping', $3, $4, $5, to_timestamp($6), $7)`,
-    [payment.id, address, shipmentId, items.length, amount, Number(payment.deadline), JSON.stringify({ shipmentId })],
-  );
-  await q("update shipments set checkout_id = $2 where id = $1", [shipmentId, payment.id]);
-  return { shipmentId, payment: serializePayment(payment), signature, amount };
+    amount,
+    minutes: CHECKOUT_MINUTES,
+    meta: { shipmentId },
+  });
+  await q("update shipments set checkout_id = $2 where id = $1", [shipmentId, checkout.checkoutId]);
+  return { ...checkout, shipmentId };
 }
 
 // ─────────────────────────────── market ───────────────────────────────
@@ -423,8 +463,9 @@ export async function marketListings() {
   );
 }
 
-/** Holds a listing for the buyer and signs a payment straight to the seller (minus the fee). */
+/** Holds a listing for the buyer, who pays the treasury; the seller is paid from the payout queue. */
 export async function checkoutListing(address: Address, listingId: string) {
+  treasury();
   const l = await one<{ id: string; seller: string; price: string }>(
     `update listings set reserved_by = $2, reserved_until = now() + interval '${LISTING_HOLD_MINUTES} minutes'
       where id = $1 and status = 'active' and seller <> $2
@@ -436,24 +477,17 @@ export async function checkoutListing(address: Address, listingId: string) {
   await ensureUser(address);
   const price = num(l.price);
   const fee = round2(price * ECONOMICS.marketFee);
-  const payment: Payment = {
-    id: newPaymentId(),
-    payer: address,
-    kind: KIND.listing,
-    ref: toRef(l.id),
+  const checkout = await createCheckout(address, {
+    kind: "listing",
+    ref: l.id,
     quantity: 1,
-    amount: toUnits(price),
-    payee: getAddress(l.seller),
-    fee: toUnits(fee),
-    deadline: BigInt(Math.floor(Date.now() / 1000) + LISTING_HOLD_MINUTES * 60),
-  };
-  const signature = await signPayment(payment);
-  await q(
-    `insert into checkouts (id, address, kind, ref, quantity, amount, fee, payee, deadline, meta)
-     values ($1, $2, 'listing', $3, 1, $4, $5, $6, to_timestamp($7), $8)`,
-    [payment.id, address, l.id, price, fee, l.seller, Number(payment.deadline), JSON.stringify({ listingId: l.id })],
-  );
-  return { payment: serializePayment(payment), signature, price, fee };
+    amount: price,
+    fee,
+    payee: l.seller,
+    minutes: LISTING_HOLD_MINUTES,
+    meta: { listingId: l.id },
+  });
+  return { ...checkout, price, fee };
 }
 
 // ─────────────────────────────── missions ───────────────────────────────
@@ -631,7 +665,7 @@ export async function markPayout(id: number, status: "paid" | "rejected", txHash
   if (p.kind === "buyback") {
     if (status === "paid") await q(`update items set status = 'sold' where id = any($1)`, [p.item_ids]);
     else await q(`update items set status = 'vault', sold_for = null where id = any($1)`, [p.item_ids]);
-  } else if (status === "rejected") {
+  } else if (p.kind === "cashback" && status === "rejected") {
     await q(`update users set cashback_balance = cashback_balance + $2 where address = $1`, [p.address, num(p.amount)]);
   }
   return p;

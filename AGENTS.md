@@ -13,17 +13,17 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 PokéCast (folder still named `holovision`; repo SolClaude33/pokemon): real-money Pokémon TCG pack opening on BNB Chain. Users pay in USDT (BEP-20), rip packs drawn provably fair on the server, keep cards in a vault, sell them back, trade them on the PokéMart, ship them home, level up for cashback and complete missions. UI copy is English.
 
 ## Structure
-- `contracts/` — Hardhat 2 project: `PokeCastPayments.sol` (EIP-712 signed checkouts; USDT goes payer → treasury or seller, never held), `MockUSDT` for local/testnet, tests, `scripts/deploy-local.ts`, `scripts/export-abi.mjs` (writes `src/lib/chain/artifacts.ts`).
-- `src/server/` (server-only) — `db.ts` (Neon via `DATABASE_URL`, else PGlite in `.data/`; schema created on boot), `session.ts` (SIWE + JWT cookie, admins via `ADMIN_ADDRESSES`), `chain.ts` (signs payments, reads `Paid` events, verifies USDT payouts), `fair.ts` (HMAC seeds), `prices.ts` (TCGplayer prices in Postgres, daily refresh, pack = sealed market + 5%), `store.ts` (all business logic).
+- `contracts/` — Hardhat 2 project with only `MockUSDT` (local chain/testnet): `scripts/deploy-local.ts`, `scripts/export-abi.mjs` (writes `src/lib/chain/artifacts.ts`). There is no payments contract.
+- `src/server/` (server-only) — `db.ts` (Neon via `DATABASE_URL`, else PGlite in `.data/`; schema created on boot), `session.ts` (SIWE + JWT cookie, admins via `ADMIN_ADDRESSES`), `chain.ts` (verifies USDT transfers to the treasury and admin payouts, scans recent treasury transfers), `fair.ts` (HMAC seeds), `prices.ts` (TCGplayer prices in Postgres, daily refresh, pack = sealed market + 5%), `store.ts` (all business logic).
 - `src/app/api/*` — thin route handlers over `store.ts`; `cron/prices` + `cron/sync` run from `vercel.json`.
 - `src/app` pages: `/` carousel, `/packs/[id]`, `/dex`, `/market`, `/missions`, `/vault`, `/profile`, `/admin`, `/how-it-works`.
-- `src/lib/` — shared config: `packs.ts` (lineup, pull rates, fees), `levels.ts`, `missions.ts`, `odds.ts`, `chain/config.ts`, `pay.ts` (client checkout: approve → pay → confirm).
+- `src/lib/` — shared config: `packs.ts` (lineup, pull rates, fees), `levels.ts`, `missions.ts`, `odds.ts`, `chain/config.ts` (treasury from `NEXT_PUBLIC_TREASURY_ADDRESS`), `pay.ts` (client checkout: USDT transfer → confirm, pending confirmations retried from localStorage), `site.ts` (`NEXT_PUBLIC_X_URL`, `NEXT_PUBLIC_CA` shown in the HUD by `SiteLinks.tsx`).
 - Card data: `src/data/sets/*.json` from `scripts/build-catalog.mjs`; images in `public/assets/`.
 
 ## Commands
 - App: `npm run dev` (preview "holovision", port 3311), `npm run build`, `npm run lint`, `npx tsc --noEmit`.
-- Contracts: `cd contracts && npx hardhat test`; after changes `npx hardhat compile && node scripts/export-abi.mjs`.
-- Local chain: `cd contracts && npx hardhat node`, then `npx hardhat run scripts/deploy-local.ts --network localhost` (writes addresses to `.env.local`), restart dev, `node scripts/e2e-local.mjs` (24 end-to-end checks).
+- Mock token: after changes `cd contracts && npx hardhat compile && node scripts/export-abi.mjs`.
+- Local chain: `cd contracts && npx hardhat node`, then `npx hardhat run scripts/deploy-local.ts --network localhost` (writes addresses to `.env.local`), restart dev, `node scripts/e2e-local.mjs` (32 end-to-end checks).
 - Catalog: `node scripts/build-catalog.mjs [--skip-images]`.
 
 ## Design tokens (keep)
@@ -35,8 +35,8 @@ Direction: late-night CRT channel ripping Pokémon packs, seen through Game Boy-
 - 3D: React Three Fiber, `flat` (no tone mapping) so printed art keeps its colors; lights from drei Lightformers (no HDR downloads).
 
 ## Conventions & limits
-- Money paths: prices come from `livePriceBook()` (uncached); every checkout is signed server-side and fulfilled only from on-chain `Paid` events (idempotent by checkout id). Outgoing USDT (buybacks, cashback) is a payout queue paid by an admin wallet from `/admin`; the server verifies the transfer.
-- Never put private keys in the repo; `.env.local` holds local-only test keys. `SIGNER_PRIVATE_KEY` holds no funds — rotate with `setSigner` if exposed. The contract owner deploys from `/admin` with their own wallet.
+- Money paths: prices come from `livePriceBook()` (uncached). Buyers send a USDT `transfer` to the treasury; `confirmPayment` checks sender, recipient, amount and block time, and `checkouts.tx_hash` is unique so one tx pays one checkout. Paying late for a sold listing or a closed shipment queues a refund. Outgoing USDT (buybacks, cashback, PokéMart seller payouts net of fee, refunds) is a payout queue paid by an admin wallet from `/admin`; the server verifies the transfer.
+- Never put private keys in the repo; `.env.local` holds local-only test values. `NEXT_PUBLIC_*` vars are inlined at build time (redeploy after changing them).
 - Pull rates are community estimates; fees, buyback rates, levels and mission rewards in `src/lib/{packs,levels,missions}.ts` are business settings.
 - Card/pack art is Nintendo/TPC IP and "Poké" branding is theirs; real-money random packs may be regulated as gambling — owner's legal call.
 - `@coinbase/cdp-sdk` is aliased to a stub in `next.config.ts` (unused Base connector dependency); PGlite is a server external.

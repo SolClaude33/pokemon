@@ -16,8 +16,8 @@ export default async function MarketPage() {
         <p className="pixel text-dim">Player market</p>
         <h1 className="poke-title mt-3 text-[clamp(2.4rem,6vw,4.6rem)] leading-[0.95]">PokéMart</h1>
         <p className="mt-4 max-w-[60ch] text-[15px] leading-relaxed text-phosphor/85">
-          Buy cards straight from other trainers&apos; vaults, or list your pulls at your own price in USDT. Payment goes directly to the
-          seller on BNB Chain and the card moves vaults instantly — it only leaves the vault when someone ships it home.
+          Buy cards straight from other trainers&apos; vaults, or list your pulls at your own price in USDT. You pay in USDT on BNB Chain, the card moves
+          vaults instantly and the seller is paid out in USDT — it only leaves the vault when someone ships it home.
         </p>
         <Suspense fallback={<div className="skeleton mt-8 h-24 w-full" />}>
           <MarketView packs={packs} dex={dex} />

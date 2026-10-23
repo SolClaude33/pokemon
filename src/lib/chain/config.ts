@@ -1,4 +1,4 @@
-import type { Address } from "viem";
+import { getAddress, isAddress, zeroAddress, type Address } from "viem";
 import { bsc, bscTestnet, hardhat } from "viem/chains";
 
 /** Which network PokéCast settles on: BSC mainnet in production, testnet or a local Hardhat node for development. */
@@ -12,13 +12,15 @@ const MAINNET_USDT: Address = "0x55d398326f99059fF775485246999027B3197955";
 export const USDT_ADDRESS = (process.env.NEXT_PUBLIC_USDT_ADDRESS || (CHAIN_KEY === "bsc" ? MAINNET_USDT : "")) as Address;
 export const USDT_DECIMALS = 18;
 
-/** PokeCastPayments contract, deployed from /admin. */
-export const PAYMENTS_ADDRESS = (process.env.NEXT_PUBLIC_PAYMENTS_ADDRESS || "") as Address;
+/** Wallet that receives every payment (packs, PokéMart, shipping). Set NEXT_PUBLIC_TREASURY_ADDRESS. */
+const rawTreasury = process.env.NEXT_PUBLIC_TREASURY_ADDRESS?.trim() ?? "";
+export const TREASURY_ADDRESS = (isAddress(rawTreasury) && rawTreasury.toLowerCase() !== zeroAddress ? getAddress(rawTreasury) : "") as Address | "";
 
 export const RPC_URL = process.env.NEXT_PUBLIC_BSC_RPC_URL || chain.rpcUrls.default.http[0];
 
-export const KIND = { pack: 0, listing: 1, shipping: 2 } as const;
-
 export const explorerTx = (hash: string) => `${chain.blockExplorers?.default.url ?? ""}/tx/${hash}`;
 
-export const isConfigured = () => !!USDT_ADDRESS && !!PAYMENTS_ADDRESS;
+export const explorerToken = (address: string) => `${chain.blockExplorers?.default.url ?? ""}/token/${address}`;
+
+/** Payments are live once USDT and a valid treasury are configured. */
+export const isConfigured = () => !!USDT_ADDRESS && !!TREASURY_ADDRESS;
